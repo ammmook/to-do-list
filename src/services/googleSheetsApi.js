@@ -2,9 +2,8 @@ const API_URL = import.meta.env.VITE_GOOGLE_SHEET_API_URL;
 
 /**
  * Google Apps Script CORS workaround:
- * All operations are sent as GET requests with URL parameters.
- * This avoids CORS preflight (OPTIONS) which Google Apps Script cannot handle.
- * For data payloads (add/update), we encode the data as a URL parameter.
+ * All operations use GET requests with URL parameters.
+ * Data model: id, subject, task, category, deadline, priority, status, note, createdAt
  */
 
 export async function fetchTodos() {
@@ -20,11 +19,17 @@ export async function fetchTodos() {
   }
 }
 
-export async function addTodo(text) {
+export async function addTodo(formData) {
   try {
     const params = new URLSearchParams({
       action: 'add',
-      text: text,
+      subject: formData.subject,
+      task: formData.task,
+      category: formData.category || '',
+      deadline: formData.deadline || '',
+      priority: formData.priority || 'Medium',
+      status: formData.status || 'Not Started',
+      note: formData.note || '',
     });
     const url = `${API_URL}?${params.toString()}`;
     const response = await fetch(url);
@@ -43,9 +48,14 @@ export async function updateTodo(id, updates) {
       action: 'update',
       id: id,
     });
-    if (updates.text !== undefined) params.set('text', updates.text);
-    if (updates.completed !== undefined) params.set('completed', updates.completed);
-    
+    if (updates.subject !== undefined) params.set('subject', updates.subject);
+    if (updates.task !== undefined) params.set('task', updates.task);
+    if (updates.category !== undefined) params.set('category', updates.category);
+    if (updates.deadline !== undefined) params.set('deadline', updates.deadline);
+    if (updates.priority !== undefined) params.set('priority', updates.priority);
+    if (updates.status !== undefined) params.set('status', updates.status);
+    if (updates.note !== undefined) params.set('note', updates.note);
+
     const url = `${API_URL}?${params.toString()}`;
     const response = await fetch(url);
     const data = await response.json();

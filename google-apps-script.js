@@ -1,127 +1,154 @@
 // Google Apps Script — paste this into your Google Sheet's Apps Script editor
 // (Extensions > Apps Script)
 //
-// After pasting, click Deploy > New deployment > Web app
+// After pasting, click Deploy > Manage deployments > Edit > New version > Deploy
 // - Execute as: Me
 // - Who has access: Anyone
-// Then copy the URL and paste it into your .env file as VITE_GOOGLE_SHEET_API_URL
 //
-// IMPORTANT: Your Google Sheet should have the first row as headers:
-// id | text | completed | createdAt
+// IMPORTANT: Your Google Sheet should have these column headers in row 1:
+// id | subject | task | category | deadline | priority | status | note | createdAt
 // (or leave it empty — the script will create headers automatically)
 
 const SHEET_NAME = 'Sheet1'; // Change this if your sheet tab has a different name
 
 function doGet(e) {
-  const action = e.parameter.action;
+  var action = e.parameter.action;
 
   switch (action) {
     case 'getAll':
-      return getAllTodos();
+      return getAllTasks();
     case 'add':
-      return addTodoItem(e.parameter.text);
+      return addTask(e.parameter);
     case 'update':
-      return updateTodoItem(e.parameter.id, e.parameter);
+      return updateTask(e.parameter.id, e.parameter);
     case 'delete':
-      return deleteTodoItem(e.parameter.id);
+      return deleteTask(e.parameter.id);
     default:
       return jsonResponse({ error: 'Unknown action: ' + action });
   }
 }
 
 function doPost(e) {
-  // Also handle POST in case it's needed
-  const body = JSON.parse(e.postData.contents);
+  var body = JSON.parse(e.postData.contents);
   return doGet({ parameter: body });
 }
 
-function getAllTodos() {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
-  
+function ensureHeaders(sheet) {
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(['id', 'subject', 'task', 'category', 'deadline', 'priority', 'status', 'note', 'createdAt']);
+  }
+}
+
+function getAllTasks() {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+  ensureHeaders(sheet);
+
   if (sheet.getLastRow() <= 1) {
-    // No data or only headers
-    if (sheet.getLastRow() === 0) {
-      sheet.appendRow(['id', 'text', 'completed', 'createdAt']);
-    }
     return jsonResponse({ data: [] });
   }
-  
-  const data = sheet.getDataRange().getValues();
-  const todos = [];
-  
-  for (let i = 1; i < data.length; i++) {
-    if (data[i][0] === '') continue; // skip empty rows
-    todos.push({
+
+  var data = sheet.getDataRange().getValues();
+  var tasks = [];
+
+  for (var i = 1; i < data.length; i++) {
+    if (data[i][0] === '') continue;
+    tasks.push({
       id: String(data[i][0]),
-      text: String(data[i][1]),
-      completed: data[i][2] === true || data[i][2] === 'TRUE' || data[i][2] === 'true',
-      createdAt: String(data[i][3]),
+      subject: String(data[i][1]),
+      task: String(data[i][2]),
+      category: String(data[i][3]),
+      deadline: String(data[i][4]),
+      priority: String(data[i][5]),
+      status: String(data[i][6]),
+      note: String(data[i][7]),
+      createdAt: String(data[i][8]),
     });
   }
 
-  // Return newest first
-  todos.reverse();
-
-  return jsonResponse({ data: todos });
+  tasks.reverse();
+  return jsonResponse({ data: tasks });
 }
 
-function addTodoItem(text) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
-  const id = Utilities.getUuid();
-  const createdAt = new Date().toISOString();
+function addTask(params) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+  ensureHeaders(sheet);
 
-  // Ensure headers exist
-  if (sheet.getLastRow() === 0) {
-    sheet.appendRow(['id', 'text', 'completed', 'createdAt']);
-  }
+  var id = Utilities.getUuid();
+  var createdAt = new Date().toISOString();
 
-  sheet.appendRow([id, text, false, createdAt]);
+  sheet.appendRow([
+    id,
+    params.subject || '',
+    params.task || '',
+    params.category || '',
+    params.deadline || '',
+    params.priority || 'Medium',
+    params.status || 'Not Started',
+    params.note || '',
+    createdAt
+  ]);
 
   return jsonResponse({
-    data: { id: id, text: text, completed: false, createdAt: createdAt },
+    data: {
+      id: id,
+      subject: params.subject || '',
+      task: params.task || '',
+      category: params.category || '',
+      deadline: params.deadline || '',
+      priority: params.priority || 'Medium',
+      status: params.status || 'Not Started',
+      note: params.note || '',
+      createdAt: createdAt
+    }
   });
 }
 
-function updateTodoItem(id, params) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
-  const data = sheet.getDataRange().getValues();
+function updateTask(id, params) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+  var data = sheet.getDataRange().getValues();
 
-  for (let i = 1; i < data.length; i++) {
+  // Column mapping: 0=id, 1=subject, 2=task, 3=category, 4=deadline, 5=priority, 6=status, 7=note, 8=createdAt
+  for (var i = 1; i < data.length; i++) {
     if (String(data[i][0]) === String(id)) {
-      if (params.text !== undefined && params.text !== null) {
-        sheet.getRange(i + 1, 2).setValue(params.text);
-      }
-      if (params.completed !== undefined && params.completed !== null) {
-        var isCompleted = params.completed === true || params.completed === 'true';
-        sheet.getRange(i + 1, 3).setValue(isCompleted);
-      }
+      if (params.subject !== undefined && params.subject !== null) sheet.getRange(i + 1, 2).setValue(params.subject);
+      if (params.task !== undefined && params.task !== null) sheet.getRange(i + 1, 3).setValue(params.task);
+      if (params.category !== undefined && params.category !== null) sheet.getRange(i + 1, 4).setValue(params.category);
+      if (params.deadline !== undefined && params.deadline !== null) sheet.getRange(i + 1, 5).setValue(params.deadline);
+      if (params.priority !== undefined && params.priority !== null) sheet.getRange(i + 1, 6).setValue(params.priority);
+      if (params.status !== undefined && params.status !== null) sheet.getRange(i + 1, 7).setValue(params.status);
+      if (params.note !== undefined && params.note !== null) sheet.getRange(i + 1, 8).setValue(params.note);
 
       return jsonResponse({
         data: {
           id: String(id),
-          text: params.text !== undefined ? String(params.text) : String(data[i][1]),
-          completed: params.completed !== undefined ? (params.completed === true || params.completed === 'true') : (data[i][2] === true || data[i][2] === 'TRUE'),
-          createdAt: String(data[i][3]),
-        },
+          subject: params.subject !== undefined ? String(params.subject) : String(data[i][1]),
+          task: params.task !== undefined ? String(params.task) : String(data[i][2]),
+          category: params.category !== undefined ? String(params.category) : String(data[i][3]),
+          deadline: params.deadline !== undefined ? String(params.deadline) : String(data[i][4]),
+          priority: params.priority !== undefined ? String(params.priority) : String(data[i][5]),
+          status: params.status !== undefined ? String(params.status) : String(data[i][6]),
+          note: params.note !== undefined ? String(params.note) : String(data[i][7]),
+          createdAt: String(data[i][8])
+        }
       });
     }
   }
 
-  return jsonResponse({ error: 'Todo not found' });
+  return jsonResponse({ error: 'Task not found' });
 }
 
-function deleteTodoItem(id) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
-  const data = sheet.getDataRange().getValues();
+function deleteTask(id) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+  var data = sheet.getDataRange().getValues();
 
-  for (let i = 1; i < data.length; i++) {
+  for (var i = 1; i < data.length; i++) {
     if (String(data[i][0]) === String(id)) {
       sheet.deleteRow(i + 1);
       return jsonResponse({ success: true });
     }
   }
 
-  return jsonResponse({ error: 'Todo not found' });
+  return jsonResponse({ error: 'Task not found' });
 }
 
 function jsonResponse(data) {

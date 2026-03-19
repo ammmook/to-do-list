@@ -1,25 +1,27 @@
 import { useState, useEffect, useCallback } from 'react'
-import TodoInput from './components/TodoInput'
-import TodoList from './components/TodoList'
-import TodoFilter from './components/TodoFilter'
+import StatusBar from './components/StatusBar'
+import StatusChart from './components/StatusChart'
+import SubjectList from './components/SubjectList'
+import TaskTable from './components/TaskTable'
+import TaskForm from './components/TaskForm'
 import { fetchTodos, addTodo, updateTodo, deleteTodo } from './services/googleSheetsApi'
 import './App.css'
 
 function App() {
-  const [todos, setTodos] = useState([])
-  const [filter, setFilter] = useState('all')
+  const [tasks, setTasks] = useState([])
   const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState(null)
   const [isSyncing, setIsSyncing] = useState(false)
+  const [error, setError] = useState(null)
+  const [showForm, setShowForm] = useState(false)
 
-  // Load todos on mount
-  const loadTodos = useCallback(async () => {
+  // Load tasks on mount
+  const loadTasks = useCallback(async () => {
     try {
       setError(null)
       const data = await fetchTodos()
-      setTodos(data)
+      setTasks(data)
     } catch (err) {
-      setError('Failed to load todos. Please check your connection.')
+      setError('Failed to load tasks. Please check your connection.')
       console.error(err)
     } finally {
       setIsLoading(false)
@@ -27,161 +29,127 @@ function App() {
   }, [])
 
   useEffect(() => {
-    loadTodos()
-  }, [loadTodos])
+    loadTasks()
+  }, [loadTasks])
 
-  // Add a new todo
-  const handleAdd = async (text) => {
+  // Add a new task
+  const handleAdd = async (formData) => {
     setIsSyncing(true)
     try {
-      const newTodo = await addTodo(text)
-      setTodos(prev => [newTodo, ...prev])
+      const newTask = await addTodo(formData)
+      setTasks(prev => [newTask, ...prev])
     } catch (err) {
-      setError('Failed to add todo.')
+      setError('Failed to add task.')
       console.error(err)
     } finally {
       setIsSyncing(false)
     }
   }
 
-  // Toggle todo completion
-  const handleToggle = async (id, completed) => {
-    // Optimistic update
-    setTodos(prev => prev.map(t => t.id === id ? { ...t, completed } : t))
+  // Change status
+  const handleStatusChange = async (id, status) => {
+    const oldTasks = [...tasks]
+    setTasks(prev => prev.map(t => t.id === id ? { ...t, status } : t))
     try {
-      await updateTodo(id, { completed })
+      await updateTodo(id, { status })
     } catch (err) {
-      // Revert on error
-      setTodos(prev => prev.map(t => t.id === id ? { ...t, completed: !completed } : t))
-      setError('Failed to update todo.')
+      setTasks(oldTasks)
+      setError('Failed to update status.')
       console.error(err)
     }
   }
 
-  // Edit todo text
-  const handleEdit = async (id, text) => {
-    const oldTodo = todos.find(t => t.id === id)
-    // Optimistic update
-    setTodos(prev => prev.map(t => t.id === id ? { ...t, text } : t))
-    try {
-      await updateTodo(id, { text })
-    } catch (err) {
-      // Revert on error
-      setTodos(prev => prev.map(t => t.id === id ? { ...t, text: oldTodo.text } : t))
-      setError('Failed to edit todo.')
-      console.error(err)
-    }
-  }
-
-  // Delete a todo
+  // Delete a task
   const handleDelete = async (id) => {
-    const oldTodos = [...todos]
-    setTodos(prev => prev.filter(t => t.id !== id))
+    const oldTasks = [...tasks]
+    setTasks(prev => prev.filter(t => t.id !== id))
     try {
       await deleteTodo(id)
     } catch (err) {
-      setTodos(oldTodos)
-      setError('Failed to delete todo.')
+      setTasks(oldTasks)
+      setError('Failed to delete task.')
       console.error(err)
     }
-  }
-
-  // Clear all completed
-  const handleClearCompleted = async () => {
-    const completedTodos = todos.filter(t => t.completed)
-    const oldTodos = [...todos]
-    setTodos(prev => prev.filter(t => !t.completed))
-    try {
-      await Promise.all(completedTodos.map(t => deleteTodo(t.id)))
-    } catch (err) {
-      setTodos(oldTodos)
-      setError('Failed to clear completed todos.')
-      console.error(err)
-    }
-  }
-
-  // Filter todos
-  const filteredTodos = todos.filter(todo => {
-    if (filter === 'active') return !todo.completed
-    if (filter === 'completed') return todo.completed
-    return true
-  })
-
-  const counts = {
-    all: todos.length,
-    active: todos.filter(t => !t.completed).length,
-    completed: todos.filter(t => t.completed).length,
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-950 relative overflow-hidden">
-      {/* Background decorations */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-96 h-96 bg-violet-600/10 rounded-full blur-3xl" />
-        <div className="absolute top-1/3 -left-40 w-80 h-80 bg-indigo-600/10 rounded-full blur-3xl" />
-        <div className="absolute -bottom-40 right-1/4 w-96 h-96 bg-purple-600/8 rounded-full blur-3xl" />
-      </div>
+    <div className="min-h-screen bg-[#fafafa] p-4 md:p-6 lg:p-8">
+      {/* Error Banner */}
+      {error && (
+        <div className="max-w-7xl mx-auto mb-4 px-4 py-3 rounded-xl bg-red-50 border border-red-200 flex items-center justify-between fade-in">
+          <p className="text-red-600 text-sm">{error}</p>
+          <button onClick={() => setError(null)} className="text-red-400 hover:text-red-600 ml-3">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+            </svg>
+          </button>
+        </div>
+      )}
 
-      {/* Main content */}
-      <div className="relative z-10 max-w-2xl mx-auto px-4 py-12 sm:py-20">
-        {/* Header */}
-        <header className="text-center mb-12">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-violet-500/10 border border-violet-500/20 mb-6">
-            <span className="w-2 h-2 rounded-full bg-violet-400 animate-pulse" />
-            <span className="text-violet-300 text-xs font-medium tracking-wider uppercase">
-              {isSyncing ? 'Syncing...' : 'Synced with Google Sheets'}
-            </span>
+      <div className="max-w-7xl mx-auto">
+        {/* Top Section: Status bar + Title + Chart */}
+        <div className="flex flex-wrap items-start justify-between gap-6 mb-8">
+          {/* Left: Status bar */}
+          <div className="flex flex-col gap-4">
+            <StatusBar tasks={tasks} />
           </div>
-          <h1 className="text-5xl sm:text-6xl font-bold bg-gradient-to-r from-white via-violet-200 to-indigo-200 bg-clip-text text-transparent mb-3 tracking-tight">
-            To-Do List
-          </h1>
-          <p className="text-white/30 text-base">
-            Organize your tasks, powered by Google Sheets
-          </p>
-        </header>
 
-        {/* Error Banner */}
-        {error && (
-          <div className="mb-6 px-5 py-3 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-between gap-3 fade-in">
-            <p className="text-rose-300 text-sm">{error}</p>
-            <button
-              onClick={() => setError(null)}
-              className="text-rose-400/60 hover:text-rose-400 transition-colors flex-shrink-0"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-              </svg>
-            </button>
+          {/* Center: Title */}
+          <div className="text-center flex-1 min-w-[200px]">
+            <h1 className="font-title text-4xl md:text-5xl text-gray-800 mb-1">Task Manager</h1>
+            <p className="text-gray-400 text-sm">Powered by Google Sheets</p>
           </div>
-        )}
 
-        {/* Glass Card */}
-        <div className="backdrop-blur-xl bg-white/[0.03] border border-white/[0.06] rounded-3xl p-6 sm:p-8 shadow-2xl shadow-black/20">
-          <TodoInput onAdd={handleAdd} isLoading={isSyncing} />
-
-          {!isLoading && todos.length > 0 && (
-            <TodoFilter
-              filter={filter}
-              onFilterChange={setFilter}
-              counts={counts}
-              onClearCompleted={handleClearCompleted}
-            />
-          )}
-
-          <TodoList
-            todos={filteredTodos}
-            onToggle={handleToggle}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
-            isLoading={isLoading}
-          />
+          {/* Right: Donut chart */}
+          <div>
+            <StatusChart tasks={tasks} />
+          </div>
         </div>
 
-        {/* Footer */}
-        <footer className="text-center mt-8 text-white/15 text-xs">
-          <p>Double-click a task to edit · Data stored in Google Sheets</p>
-        </footer>
+        {/* Add Task Button */}
+        <div className="flex justify-end mb-4">
+          <button
+            onClick={() => setShowForm(true)}
+            className="px-5 py-2.5 rounded-xl text-sm font-medium text-white
+                       bg-gradient-to-r from-pink-400 to-rose-400
+                       hover:from-pink-500 hover:to-rose-500
+                       shadow-sm hover:shadow-md transition-all active:scale-95
+                       flex items-center gap-2"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+            </svg>
+            Add Task
+          </button>
+        </div>
+
+        {/* Main content: Table + Subject List */}
+        <div className="flex gap-4 items-start">
+          {/* Table (main area) */}
+          <div className="flex-1 min-w-0">
+            <TaskTable
+              tasks={tasks}
+              onStatusChange={handleStatusChange}
+              onDelete={handleDelete}
+              isLoading={isLoading}
+            />
+          </div>
+
+          {/* Subject sidebar */}
+          <div className="w-[180px] flex-shrink-0 hidden lg:block">
+            <SubjectList tasks={tasks} />
+          </div>
+        </div>
       </div>
+
+      {/* Task Form Modal */}
+      {showForm && (
+        <TaskForm
+          onAdd={handleAdd}
+          onClose={() => setShowForm(false)}
+          isLoading={isSyncing}
+        />
+      )}
     </div>
   )
 }
