@@ -124,7 +124,7 @@ function TaskRow({ task, index, onStatusChange, onDelete }) {
       <td className="px-4 py-3 text-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
         <button
           onClick={() => onDelete(task.id)}
-          className="text-slate-400 hover:text-red-500 hover:bg-red-50 p-1.5 rounded-md transition-colors"
+          className="text-slate-400 hover:text-red-500 hover:bg-red-50 p-1.5 rounded-md transition-colors cursor-pointer button-pop"
           title="Delete task"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">

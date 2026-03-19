@@ -40,7 +40,7 @@ function SubjectManager({ savedSubjectsForTerm, onAddSubject, onDeleteSubject })
   };
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200/80 shadow-sm overflow-hidden">
+    <div className="interactive-card hover-lift p-0 overflow-hidden">
       {/* Header */}
       <div className="px-4 py-3 border-b border-slate-100">
         <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Subjects</h3>
@@ -56,17 +56,12 @@ function SubjectManager({ savedSubjectsForTerm, onAddSubject, onDeleteSubject })
             onKeyDown={handleKeyDown}
             placeholder="Add subject..."
             disabled={isAdding}
-            className="flex-1 min-w-0 px-3 py-1.5 rounded-lg border border-slate-200 text-xs text-slate-800
-                       focus:outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100
-                       placeholder-slate-400 transition-all bg-white disabled:opacity-50"
+            className="interactive-input"
           />
           <button
             onClick={handleAddSubject}
             disabled={!newSubjectInputText.trim() || isAdding}
-            className="px-3 py-1.5 rounded-lg text-xs font-medium text-white
-                       bg-slate-800 hover:bg-slate-700
-                       disabled:opacity-30 disabled:cursor-not-allowed
-                       transition-all active:scale-95 flex-shrink-0"
+            className="interactive-button button-pop !px-3 !py-1.5 !text-xs"
           >
             {isAdding ? '...' : 'Add'}
           </button>
@@ -94,8 +89,7 @@ function SubjectManager({ savedSubjectsForTerm, onAddSubject, onDeleteSubject })
               </div>
               <button
                 onClick={() => onDeleteSubject(subject.id)}
-                className="text-slate-300 hover:text-red-500 p-1 rounded-md opacity-0 group-hover:opacity-100
-                           transition-all flex-shrink-0 hover:bg-red-50"
+                className="text-slate-300 hover:text-red-500 p-1 rounded-md opacity-0 group-hover:opacity-100 transition-all flex-shrink-0 hover:bg-red-50 cursor-pointer button-pop"
                 title="Remove subject"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">

@@ -9,10 +9,7 @@ import { AVAILABLE_ACADEMIC_YEARS, AVAILABLE_SEMESTERS } from '../data/academicC
  * and visually cleaner in a narrow column.
  */
 function TermSelector({ selectedAcademicYear, selectedSemester, onTermChange }) {
-  const selectorClassName =
-    'w-full px-3 py-2 rounded-lg border border-slate-200 text-sm text-slate-800 ' +
-    'focus:outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 ' +
-    'bg-white transition-all cursor-pointer appearance-none';
+  const selectorClassName = "interactive-input cursor-pointer appearance-none";
 
   const handleYearChange = (event) => {
     const newYear = Number(event.target.value);
@@ -25,7 +22,7 @@ function TermSelector({ selectedAcademicYear, selectedSemester, onTermChange }) 
   };
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200/80 p-4 shadow-sm">
+    <div className="interactive-card hover-lift">
       <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
         Academic Term
       </h3>

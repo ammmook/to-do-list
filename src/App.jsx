@@ -188,10 +188,10 @@ function App() {
 
   // ─── Render Dashboard ──────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-slate-50 font-sans flex flex-col md:flex-row">
+    <div className="dashboard-container font-sans">
       
       {/* ═══════════ MOBILE HEADER (Visible only on small screens) ═══════════ */}
-      <header className="md:hidden bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between sticky top-0 z-20 shadow-sm">
+      <header className="md:hidden bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between sticky top-0 z-20 shadow-sm cursor-pointer" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center text-white">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -215,8 +215,7 @@ function App() {
             </div>
           )}
           <button 
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="p-1.5 text-slate-600 hover:bg-slate-100 rounded-md transition-colors"
+            className="p-1.5 text-slate-600 hover:bg-slate-100 rounded-md transition-colors button-pop"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               {isMobileMenuOpen ? (
@@ -230,18 +229,14 @@ function App() {
       </header>
 
       {/* ═══════════ LEFT SIDEBAR ═══════════
-       * WHY responsive sidebar classes:
-       * On desktop (md:flex), it's a fixed-width static column.
-       * On mobile (isMobileMenuOpen ? 'flex' : 'hidden'), it acts as a collapsible dropdown panel.
+       * Uses the semantic .dashboard-sidebar class.
        */}
-      <aside className={`dashboard-sidebar w-full md:w-[260px] flex-shrink-0 bg-white md:border-r border-slate-200
-                        p-4 md:p-5 flex-col gap-5 md:min-h-screen md:overflow-y-auto 
-                        ${isMobileMenuOpen ? 'flex border-b shadow-md absolute z-10 w-full' : 'hidden md:flex relative'}`}>
+      <aside className={`dashboard-sidebar ${isMobileMenuOpen ? 'flex absolute z-10 w-full shadow-md' : 'hidden md:flex relative'}`}>
 
         {/* Desktop Branding (Hidden on mobile via header) */}
-        <div className="hidden md:block mb-1">
+        <div className="hidden md:block mb-1 fade-in">
           <div className="flex items-center gap-2.5 mb-2">
-            <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center text-white">
+            <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center text-white shadow-sm">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                 <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
                 <path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd" />
@@ -254,7 +249,7 @@ function App() {
         </div>
 
         {/* User Profile Card */}
-        <div className="bg-slate-50 rounded-xl p-3 flex items-center justify-between border border-slate-100">
+        <div className="bg-slate-50 rounded-xl p-3 flex items-center justify-between border border-slate-100 fade-in stagger-1 hover-lift">
           <div className="flex items-center gap-3 overflow-hidden">
             {userProfile.picture ? (
               <img src={userProfile.picture} alt="Profile" className="w-8 h-8 rounded-full border border-slate-200 flex-shrink-0 hidden md:block" />
@@ -270,7 +265,7 @@ function App() {
           </div>
           <button
             onClick={handleLogout}
-            className="text-slate-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded-md transition-colors flex-shrink-0"
+            className="text-slate-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded-md transition-colors flex-shrink-0 button-pop cursor-pointer"
             title="Sign Out"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -279,19 +274,23 @@ function App() {
           </button>
         </div>
 
-        {/* Term Selector */}
-        <TermSelector
-          selectedAcademicYear={selectedAcademicYear}
-          selectedSemester={selectedSemester}
-          onTermChange={handleTermChange}
-        />
+        <div className="fade-in stagger-2">
+          {/* Term Selector */}
+          <TermSelector
+            selectedAcademicYear={selectedAcademicYear}
+            selectedSemester={selectedSemester}
+            onTermChange={handleTermChange}
+          />
+        </div>
 
-        {/* Subject Manager */}
-        <SubjectManager
-          savedSubjectsForTerm={savedSubjectsForSelectedTerm}
-          onAddSubject={handleAddSubject}
-          onDeleteSubject={handleDeleteSubject}
-        />
+        <div className="fade-in stagger-3">
+          {/* Subject Manager */}
+          <SubjectManager
+            savedSubjectsForTerm={savedSubjectsForSelectedTerm}
+            onAddSubject={handleAddSubject}
+            onDeleteSubject={handleDeleteSubject}
+          />
+        </div>
 
         {/* Status Chart (Hidden on mobile sidebar to save vertical space, shown in main content instead) */}
         <div className="hidden md:block">
@@ -312,16 +311,18 @@ function App() {
         />
       )}
 
-      {/* ═══════════ MAIN CONTENT AREA ═══════════ */}
-      <main className="flex-1 min-w-0 p-4 sm:p-6 md:p-8 overflow-y-auto md:min-h-screen">
+      {/* ═══════════ MAIN CONTENT AREA ═══════════
+       * Powered by .dashboard-main CSS
+       */}
+      <main className="dashboard-main fade-in stagger-1">
 
         {/* Error Banner */}
         {error && (
-          <div className="mb-6 px-4 py-3 rounded-xl bg-red-50 border border-red-100 flex items-center justify-between fade-in">
+          <div className="px-4 py-3 rounded-xl bg-red-50 border border-red-100 flex items-center justify-between fade-in hover-lift">
             <p className="text-red-600 text-sm">{error}</p>
             <button
               onClick={() => setError(null)}
-              className="text-red-400 hover:text-red-600 ml-3 transition-colors p-1 rounded-md hover:bg-red-100"
+              className="text-red-400 hover:text-red-600 ml-3 transition-colors p-1 rounded-md hover:bg-red-100 button-pop cursor-pointer"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
@@ -331,7 +332,7 @@ function App() {
         )}
 
         {/* Main Header — Title + Action button */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 fade-in">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 fade-in">
           <div>
             <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
               Year {selectedAcademicYear} · Semester {selectedSemester}
@@ -343,10 +344,7 @@ function App() {
 
           <button
             onClick={() => setShowTaskForm(true)}
-            className="w-full sm:w-auto px-5 py-2.5 rounded-xl text-sm font-semibold text-white
-                       bg-slate-900 hover:bg-slate-800 focus:ring-4 focus:ring-slate-200
-                       shadow-sm hover:shadow-md transition-all duration-200 active:scale-[0.98]
-                       flex items-center justify-center gap-2"
+            className="w-full sm:w-auto interactive-button fade-in hover-lift"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
@@ -356,12 +354,12 @@ function App() {
         </div>
 
         {/* Status Summary Cards (Stacks on mobile) */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 fade-in">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 fade-in stagger-2">
           <StatusSummaryCards tasks={tasksForSelectedTerm} />
         </div>
 
         {/* Task Table */}
-        <div className="fade-in bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mb-6">
+        <div className="fade-in stagger-3 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden hover-lift flex-1 min-h-[400px]">
           <TaskTable
             tasks={tasksForSelectedTerm}
             onStatusChange={handleStatusChange}

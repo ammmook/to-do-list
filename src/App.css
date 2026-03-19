@@ -1,39 +1,192 @@
-/* ===== Dashboard Minimalist Styles ===== */
+/* ===== Dashboard UI Redesign 2.0 =========================================
+ *
+ * WHY Semantic CSS Classes:
+ * Moving away from heavy inline Tailwind classes for structural layouts
+ * keeps component files clean and makes responsive behavior easier to manage.
+ *
+ * Structure:
+ * 1. Global Interactions (Cursor, Focus)
+ * 2. Layouts & Grids
+ * 3. Components (Cards, Buttons, Inputs)
+ * 4. Animations
+ * ========================================================================= */
 
-/*
- * WHY custom scrollbar:
- * The default browser scrollbar is thick and visually distracting.
- * A slim, translucent scrollbar keeps the dashboard looking clean
- * without sacrificing scroll functionality.
- */
+/* ─── 1. Global Interactions ────────────────────────────────────────────── */
+
+/* Explicitly enforce touch/click affordance on interactive elements */
+button, 
+select, 
+input[type="checkbox"], 
+.interactive-icon,
+.cursor-pointer {
+  cursor: pointer !important;
+}
+
+/* Custom scrollbar for a clean, minimalist look */
 ::-webkit-scrollbar {
   width: 5px;
   height: 5px;
 }
-
 ::-webkit-scrollbar-track {
   background: transparent;
 }
-
 ::-webkit-scrollbar-thumb {
   background: #cbd5e1;
   border-radius: 999px;
 }
-
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
 
-/* ─── Entrance Animations ─────────────────────────────────────── */
+/* ─── 2. Layouts & Grids ────────────────────────────────────────────────── */
+
+/* 
+ * dashboard-container
+ * A balanced CSS Grid layout prioritizing the main content area while
+ * giving the sidebar a consistent, predictable width on desktop.
+ */
+.dashboard-container {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  min-height: 100vh;
+  background-color: #f8fafc; /* slate-50 */
+}
+
+.dashboard-sidebar {
+  background-color: #ffffff;
+  border-right: 1px solid #e2e8f0; /* slate-200 */
+  display: flex;
+  flex-direction: column;
+  padding: 1.5rem;
+  gap: 1.5rem;
+  /* Keep sidebar scrollable independently */
+  max-height: 100vh;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.dashboard-main {
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  max-height: 100vh;
+  overflow-y: auto;
+}
+
+/* Mobile Responsiveness — Stack vertically on small screens */
+@media (max-width: 850px) {
+  .dashboard-container {
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .dashboard-sidebar {
+    /* Transforms into an off-canvas or absolute dropdown menu in JS */
+    border-right: none;
+    border-bottom: 1px solid #e2e8f0;
+    max-height: none;
+    overflow-y: visible;
+  }
+  
+  .dashboard-main {
+    padding: 1.25rem;
+  }
+}
+
+/* ─── 3. Components ─────────────────────────────────────────────────────── */
+
+/* Interactive Card: Used for summary metrics, subjects, and task rows */
+.interactive-card {
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0; /* slate-200 */
+  border-radius: 0.75rem; /* rounded-xl */
+  padding: 1rem;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); /* shadow-sm */
+}
+
+/* Hover-Lift logic separated to apply only when intended */
+.hover-lift:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); /* shadow-lg */
+  border-color: #cbd5e1; /* slate-300 */
+}
+
+/* Interactive Input: Forms, Dropdowns */
+.interactive-input {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.375rem; /* rounded-md */
+  border: 1px solid #cbd5e1; /* slate-300 */
+  background-color: #ffffff;
+  font-size: 0.875rem; /* text-sm */
+  color: #0f172a; /* slate-900 */
+  transition: all 0.2s ease-in-out;
+}
+
+.interactive-input:focus {
+  outline: none;
+  border-color: #64748b; /* slate-500 */
+  box-shadow: 0 0 0 1px #64748b; /* ring-1 */
+}
+
+/* Interactive Button: Standardized buttons */
+.interactive-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.25rem;
+  border-radius: 0.75rem; /* rounded-xl */
+  font-size: 0.875rem; /* text-sm */
+  font-weight: 600; /* font-semibold */
+  color: #ffffff;
+  background-color: #0f172a; /* slate-900 */
+  border: none;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); /* shadow-sm */
+}
+
+.interactive-button:hover:not(:disabled) {
+  background-color: #1e293b; /* slate-800 */
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); /* shadow-md */
+}
+
+/* The button press effect */
+.interactive-button:active:not(:disabled),
+.button-pop:active {
+  transform: scale(0.96);
+}
+
+.interactive-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed !important;
+}
+
+/* Secondary ghost button styles */
+.interactive-button-ghost {
+  background-color: transparent;
+  color: #475569; /* slate-600 */
+  box-shadow: none;
+}
+
+.interactive-button-ghost:hover:not(:disabled) {
+  background-color: #f1f5f9; /* slate-100 */
+  color: #0f172a; /* slate-900 */
+  box-shadow: none;
+}
+
+/* ─── 4. Animations ─────────────────────────────────────────────────────── */
 
 .fade-in {
-  animation: fadeIn 0.35s ease-out forwards;
+  animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 @keyframes fadeIn {
   from {
     opacity: 0;
-    transform: translateY(6px);
+    transform: translateY(8px);
   }
   to {
     opacity: 1;
@@ -41,13 +194,13 @@
   }
 }
 
-/* ─── Modal System ────────────────────────────────────────────── */
-/*
- * WHY a two-part animation (overlay + content):
- * The overlay dims the background while the content card scales in.
- * This layered approach gives a perceived depth that feels native.
- */
+/* Staggered list animations */
+.stagger-1 { animation-delay: 0.05s; }
+.stagger-2 { animation-delay: 0.10s; }
+.stagger-3 { animation-delay: 0.15s; }
 
+
+/* Modal Animations */
 .modal-overlay {
   animation: overlayFadeIn 0.25s ease-out forwards;
 }
@@ -70,22 +223,10 @@
 @keyframes modalSlideIn {
   from {
     opacity: 0;
-    transform: scale(0.97) translateY(10px);
+    transform: scale(0.96) translateY(12px);
   }
   to {
     opacity: 1;
     transform: scale(1) translateY(0);
   }
-}
-
-/* ─── Dashboard Sidebar ───────────────────────────────────────── */
-/*
- * WHY fixed sidebar with min-height:
- * On a single-screen dashboard, the sidebar must stay visible
- * while the main content scrolls. min-h-screen keeps it full-height.
- */
-
-.dashboard-sidebar {
-  scrollbar-width: thin;
-  scrollbar-color: #e2e8f0 transparent;
 }

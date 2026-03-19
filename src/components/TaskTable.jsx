@@ -11,7 +11,7 @@ function TaskTable({ tasks, onStatusChange, onDelete, isLoading }) {
   }
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+    <div className="w-full">
       <div className="overflow-x-auto">
         <table className="w-full text-sm text-left whitespace-nowrap">
           <thead className="bg-slate-50/80 border-b border-slate-200 text-slate-500 text-xs font-medium uppercase tracking-wider">

@@ -46,11 +46,6 @@ function TaskForm({ savedSubjectsList, onAdd, onClose, isLoading }) {
     }
   };
 
-  const inputClassName =
-    'w-full px-3 py-2 rounded-md border border-slate-300 text-sm text-slate-900 ' +
-    'focus:outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500 ' +
-    'placeholder-slate-400 transition-all bg-white';
-
   const isSubmitDisabled =
     !selectedSubjectForTask.trim() ||
     !newTaskDescription.trim() ||
@@ -66,7 +61,7 @@ function TaskForm({ savedSubjectsList, onAdd, onClose, isLoading }) {
             <h2 className="text-lg font-semibold text-slate-900">Create Task</h2>
             <p className="text-sm text-slate-500">Fill in the details for your new task.</p>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors p-1 rounded-md hover:bg-slate-100">
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors p-1 rounded-md hover:bg-slate-100 cursor-pointer button-pop">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
             </svg>
@@ -90,7 +85,7 @@ function TaskForm({ savedSubjectsList, onAdd, onClose, isLoading }) {
               value={selectedSubjectForTask}
               onChange={e => setSelectedSubjectForTask(e.target.value)}
               disabled={hasNoSavedSubjects}
-              className={inputClassName}
+              className="interactive-input cursor-pointer"
             >
               {hasNoSavedSubjects && (
                 <option value="">— Add subjects in the sidebar first —</option>
@@ -112,7 +107,7 @@ function TaskForm({ savedSubjectsList, onAdd, onClose, isLoading }) {
               onChange={e => setNewTaskDescription(e.target.value)}
               placeholder="e.g. Complete chapter 4 assignment"
               required
-              className={inputClassName}
+              className="interactive-input"
             />
           </div>
 
@@ -123,7 +118,7 @@ function TaskForm({ savedSubjectsList, onAdd, onClose, isLoading }) {
               <select
                 value={newTaskCategory}
                 onChange={e => setNewTaskCategory(e.target.value)}
-                className={inputClassName}
+                className="interactive-input cursor-pointer"
               >
                 <option value="Exam">Exam</option>
                 <option value="Project">Project</option>
@@ -138,7 +133,7 @@ function TaskForm({ savedSubjectsList, onAdd, onClose, isLoading }) {
                 type="date"
                 value={newTaskDeadline}
                 onChange={e => setNewTaskDeadline(e.target.value)}
-                className={inputClassName}
+                className="interactive-input cursor-pointer"
               />
             </div>
           </div>
@@ -150,7 +145,7 @@ function TaskForm({ savedSubjectsList, onAdd, onClose, isLoading }) {
               <select
                 value={newTaskStatus}
                 onChange={e => setNewTaskStatus(e.target.value)}
-                className={inputClassName}
+                className="interactive-input cursor-pointer"
               >
                 <option value="Not Started">Not Started</option>
                 <option value="Pending">Pending</option>
@@ -172,7 +167,7 @@ function TaskForm({ savedSubjectsList, onAdd, onClose, isLoading }) {
               onChange={e => setNewTaskNote(e.target.value)}
               placeholder="Add any extra details here..."
               rows={2}
-              className={`${inputClassName} resize-none`}
+              className="interactive-input resize-none"
             />
           </div>
 
@@ -181,17 +176,14 @@ function TaskForm({ savedSubjectsList, onAdd, onClose, isLoading }) {
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-md text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors"
+              className="interactive-button interactive-button-ghost"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitDisabled}
-              className="px-4 py-2 rounded-md text-sm font-medium text-white
-                         bg-slate-900 hover:bg-slate-800
-                         disabled:opacity-50 disabled:cursor-not-allowed
-                         shadow-sm transition-all duration-200 active:scale-[0.98]"
+              className="interactive-button"
             >
               {isLoading ? 'Saving...' : 'Save Task'}
             </button>

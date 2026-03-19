@@ -34,12 +34,11 @@ function StatusSummaryCards({ tasks }) {
   ];
 
   return (
-    <div className="grid grid-cols-3 gap-4 mb-6 fade-in">
+    <>
       {cardData.map((card) => (
         <div
           key={card.label}
-          className="bg-white rounded-xl border border-slate-200/80 px-5 py-4 shadow-sm
-                     hover:shadow-md transition-shadow duration-300"
+          className="interactive-card hover-lift"
         >
           <div className="flex items-center gap-2 mb-2">
             <span className={`w-2 h-2 rounded-full ${card.dotColor}`} />
@@ -51,7 +50,7 @@ function StatusSummaryCards({ tasks }) {
           </div>
         </div>
       ))}
-    </div>
+    </>
   );
 }
 
