@@ -11,6 +11,6 @@
  * without touching component code.
  */
 
-export const AVAILABLE_ACADEMIC_YEARS = [2567, 2568, 2569];
+export const AVAILABLE_ACADEMIC_YEARS = [2567, 2568, 2569, 2570];
 
 export const AVAILABLE_SEMESTERS = [1, 2];
