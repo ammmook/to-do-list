@@ -1,43 +1,47 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import LoginScreen from './components/LoginScreen'
 import TermSelector from './components/TermSelector'
-import StatusBar from './components/StatusBar'
+import StatusSummaryCards from './components/StatusBar'
 import StatusChart from './components/StatusChart'
 import SubjectManager from './components/SubjectManager'
 import TaskTable from './components/TaskTable'
 import TaskForm from './components/TaskForm'
+
 import {
-  fetchTodos, addTodo, updateTodo, deleteTodo,
-  fetchSavedSubjects, saveNewSubject, removeSubject
+  fetchTodosForUser, addTodoWithUserEmail, updateTodoWithUserEmail, deleteTodoWithUserEmail,
+  fetchSavedSubjectsForUser, saveNewSubjectWithUserEmail, removeSubjectWithUserEmail
 } from './services/googleSheetsApi'
+
+import {
+  isAuthenticated, saveAccessToken, saveUserProfile, getUserProfile, clearAuth
+} from './services/authService'
+
 import { AVAILABLE_ACADEMIC_YEARS, AVAILABLE_SEMESTERS } from './data/academicConfig'
 import './App.css'
 
 function App() {
+  // ─── Auth State ────────────────────────────────────────────────
+  const [isLoggedIn, setIsLoggedIn] = useState(isAuthenticated())
+  const [userProfile, setUserProfile] = useState(getUserProfile())
+
   // ─── Term Selection State ──────────────────────────────────────
-  // Default to the latest available year and first semester
   const defaultAcademicYear = AVAILABLE_ACADEMIC_YEARS[AVAILABLE_ACADEMIC_YEARS.length - 1]
   const defaultSemester = AVAILABLE_SEMESTERS[0]
-
   const [selectedAcademicYear, setSelectedAcademicYear] = useState(defaultAcademicYear)
   const [selectedSemester, setSelectedSemester] = useState(defaultSemester)
 
-  // ─── Task State ────────────────────────────────────────────────
-  // allTasks holds every task from Google Sheets, regardless of term.
-  // We filter it client-side based on the selected Year + Semester.
+  // ─── Data State ────────────────────────────────────────────────
   const [allTasks, setAllTasks] = useState([])
+  const [allSavedSubjects, setAllSavedSubjects] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [isSyncing, setIsSyncing] = useState(false)
   const [error, setError] = useState(null)
-  const [showForm, setShowForm] = useState(false)
 
-  // ─── Subject State ─────────────────────────────────────────────
-  // allSavedSubjects holds every subject from the "Subjects" sheet tab.
-  // We filter it client-side to show only subjects for the selected term.
-  const [allSavedSubjects, setAllSavedSubjects] = useState([])
+  // ─── UI State ──────────────────────────────────────────────────
+  const [showTaskForm, setShowTaskForm] = useState(false)
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   // ─── Derived Data ──────────────────────────────────────────────
-
-  // Tasks isolated to the currently selected academic term
   const tasksForSelectedTerm = useMemo(() => {
     return allTasks.filter((task) => {
       const matchesYear = String(task.academicYear) === String(selectedAcademicYear)
@@ -46,7 +50,6 @@ function App() {
     })
   }, [allTasks, selectedAcademicYear, selectedSemester])
 
-  // Subjects saved for the currently selected term only
   const savedSubjectsForSelectedTerm = useMemo(() => {
     return allSavedSubjects.filter((subject) => {
       const matchesYear = String(subject.academicYear) === String(selectedAcademicYear)
@@ -56,13 +59,16 @@ function App() {
   }, [allSavedSubjects, selectedAcademicYear, selectedSemester])
 
   // ─── Data Loading ──────────────────────────────────────────────
-  // Load both tasks and subjects in parallel on mount
   const loadAllData = useCallback(async () => {
+    if (!isLoggedIn || !userProfile.email) return;
+
+    setIsLoading(true);
     try {
       setError(null)
+      // Secure Data Handling: Only fetch data bound to the logged-in email
       const [tasksData, subjectsData] = await Promise.all([
-        fetchTodos(),
-        fetchSavedSubjects()
+        fetchTodosForUser(userProfile.email),
+        fetchSavedSubjectsForUser(userProfile.email)
       ])
       setAllTasks(tasksData)
       setAllSavedSubjects(subjectsData)
@@ -72,31 +78,45 @@ function App() {
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [isLoggedIn, userProfile.email])
 
   useEffect(() => {
     loadAllData()
   }, [loadAllData])
 
-  // ─── Term Event Handler ────────────────────────────────────────
+  // ─── Auth Handlers ─────────────────────────────────────────────
+  const handleLoginSuccess = (credential) => {
+    saveAccessToken(credential);
+    const profile = saveUserProfile(credential);
+    setUserProfile(profile);
+    setIsLoggedIn(true);
+  };
 
+  const handleLogout = () => {
+    clearAuth();
+    setIsLoggedIn(false);
+    setAllTasks([]);
+    setAllSavedSubjects([]);
+    setUserProfile({ name: 'User', email: '', picture: '' });
+  };
+
+  // ─── Term Handler ──────────────────────────────────────────────
   const handleTermChange = (newYear, newSemester) => {
     setSelectedAcademicYear(newYear)
     setSelectedSemester(newSemester)
   }
 
-  // ─── Task Event Handlers ───────────────────────────────────────
-
+  // ─── Task Handlers ─────────────────────────────────────────────
   const handleAddTask = async (formData) => {
     setIsSyncing(true)
     try {
-      // Attach the currently selected term so the task is scoped correctly
       const taskDataWithTerm = {
         ...formData,
         academicYear: selectedAcademicYear,
         semester: selectedSemester,
       }
-      const newTask = await addTodo(taskDataWithTerm)
+      // Secure Data Handling: Append user email on save
+      const newTask = await addTodoWithUserEmail(taskDataWithTerm, userProfile.email)
       setAllTasks(previousTasks => [newTask, ...previousTasks])
     } catch (err) {
       setError('Failed to add task.')
@@ -108,14 +128,12 @@ function App() {
 
   const handleStatusChange = async (taskId, newStatus) => {
     const previousTasks = [...allTasks]
-    // Optimistic update: apply the change immediately for a responsive UI
     setAllTasks(prev => prev.map(task =>
       task.id === taskId ? { ...task, status: newStatus } : task
     ))
     try {
-      await updateTodo(taskId, { status: newStatus })
+      await updateTodoWithUserEmail(taskId, { status: newStatus }, userProfile.email)
     } catch (err) {
-      // Revert to the previous state if the API call fails
       setAllTasks(previousTasks)
       setError('Failed to update status.')
       console.error(err)
@@ -126,7 +144,7 @@ function App() {
     const previousTasks = [...allTasks]
     setAllTasks(prev => prev.filter(task => task.id !== taskId))
     try {
-      await deleteTodo(taskId)
+      await deleteTodoWithUserEmail(taskId, userProfile.email)
     } catch (err) {
       setAllTasks(previousTasks)
       setError('Failed to delete task.')
@@ -134,14 +152,15 @@ function App() {
     }
   }
 
-  // ─── Subject Event Handlers ────────────────────────────────────
-
+  // ─── Subject Handlers ──────────────────────────────────────────
   const handleAddSubject = async (subjectName) => {
     try {
-      const savedSubject = await saveNewSubject(
+      // Secure Data Handling: Append user email on save
+      const savedSubject = await saveNewSubjectWithUserEmail(
         subjectName,
         selectedAcademicYear,
-        selectedSemester
+        selectedSemester,
+        userProfile.email
       )
       setAllSavedSubjects(previousSubjects => [...previousSubjects, savedSubject])
     } catch (err) {
@@ -154,7 +173,7 @@ function App() {
     const previousSubjects = [...allSavedSubjects]
     setAllSavedSubjects(prev => prev.filter(s => s.id !== subjectId))
     try {
-      await removeSubject(subjectId)
+      await removeSubjectWithUserEmail(subjectId, userProfile.email)
     } catch (err) {
       setAllSavedSubjects(previousSubjects)
       setError('Failed to remove subject.')
@@ -162,78 +181,211 @@ function App() {
     }
   }
 
-  // ─── Render ────────────────────────────────────────────────────
+  // ─── Render Authentication Gate ────────────────────────────────
+  if (!isLoggedIn) {
+    return <LoginScreen onLoginSuccess={handleLoginSuccess} />
+  }
+
+  // ─── Render Dashboard ──────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 p-4 md:p-8 font-sans selection:bg-indigo-100 selection:text-indigo-900">
-      {error && (
-        <div className="max-w-7xl mx-auto mb-6 px-4 py-3 rounded-lg bg-red-50 border border-red-100 flex items-center justify-between fade-in">
-          <p className="text-red-600 text-sm">{error}</p>
-          <button onClick={() => setError(null)} className="text-red-400 hover:text-red-600 ml-3 transition-colors">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+    <div className="min-h-screen bg-slate-50 font-sans flex flex-col md:flex-row">
+      
+      {/* ═══════════ MOBILE HEADER (Visible only on small screens) ═══════════ */}
+      <header className="md:hidden bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between sticky top-0 z-20 shadow-sm">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center text-white">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
+              <path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd" />
+            </svg>
+          </div>
+          <div>
+            <h1 className="text-sm font-bold text-slate-900 leading-tight">Task Manager</h1>
+            <p className="text-[10px] text-slate-500">Academic Dashboard</p>
+          </div>
+        </div>
+        
+        {/* Mobile Menu Toggle & User Avatar */}
+        <div className="flex items-center gap-3">
+          {userProfile.picture ? (
+            <img src={userProfile.picture} alt="Profile" className="w-8 h-8 rounded-full border border-slate-200 shadow-sm" />
+          ) : (
+            <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 text-xs font-bold">
+              {userProfile.name.charAt(0).toUpperCase()}
+            </div>
+          )}
+          <button 
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="p-1.5 text-slate-600 hover:bg-slate-100 rounded-md transition-colors"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              {isMobileMenuOpen ? (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              ) : (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              )}
             </svg>
           </button>
         </div>
-      )}
+      </header>
 
-      <div className="max-w-7xl mx-auto fade-in">
-        {/* Header: Title + Term selector + Status + New Task button */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8 border-b border-slate-200 pb-6">
-          <div>
-            <h1 className="text-3xl font-semibold tracking-tight text-slate-900 mb-1">Tasks</h1>
-            <p className="text-slate-500 text-sm">Manage your academic priorities seamlessly.</p>
-          </div>
+      {/* ═══════════ LEFT SIDEBAR ═══════════
+       * WHY responsive sidebar classes:
+       * On desktop (md:flex), it's a fixed-width static column.
+       * On mobile (isMobileMenuOpen ? 'flex' : 'hidden'), it acts as a collapsible dropdown panel.
+       */}
+      <aside className={`dashboard-sidebar w-full md:w-[260px] flex-shrink-0 bg-white md:border-r border-slate-200
+                        p-4 md:p-5 flex-col gap-5 md:min-h-screen md:overflow-y-auto 
+                        ${isMobileMenuOpen ? 'flex border-b shadow-md absolute z-10 w-full' : 'hidden md:flex relative'}`}>
 
-          <div className="flex flex-wrap items-center gap-4">
-            <TermSelector
-              selectedAcademicYear={selectedAcademicYear}
-              selectedSemester={selectedSemester}
-              onTermChange={handleTermChange}
-            />
-            <StatusBar tasks={tasksForSelectedTerm} />
-            <button
-              onClick={() => setShowForm(true)}
-              className="px-4 py-2 rounded-md text-sm font-medium text-white
-                         bg-slate-900 hover:bg-slate-800
-                         shadow-sm transition-all duration-200 active:scale-[0.98]
-                         flex items-center gap-2"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+        {/* Desktop Branding (Hidden on mobile via header) */}
+        <div className="hidden md:block mb-1">
+          <div className="flex items-center gap-2.5 mb-2">
+            <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center text-white">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
+                <path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd" />
               </svg>
-              New Task
-            </button>
-          </div>
-        </div>
-
-        {/* Main content: Table + Sidebar */}
-        <div className="flex gap-6 items-start">
-          <div className="flex-1 min-w-0">
-            <TaskTable
-              tasks={tasksForSelectedTerm}
-              onStatusChange={handleStatusChange}
-              onDelete={handleDeleteTask}
-              isLoading={isLoading}
-            />
-          </div>
-          <div className="w-[220px] flex-shrink-0 hidden lg:block">
-            <SubjectManager
-              savedSubjectsForTerm={savedSubjectsForSelectedTerm}
-              onAddSubject={handleAddSubject}
-              onDeleteSubject={handleDeleteSubject}
-            />
-            <div className="mt-6">
-              <StatusChart tasks={tasksForSelectedTerm} />
+            </div>
+            <div>
+              <h1 className="text-lg font-bold text-slate-900 tracking-tight leading-none">Task Manager</h1>
             </div>
           </div>
         </div>
-      </div>
 
-      {showForm && (
+        {/* User Profile Card */}
+        <div className="bg-slate-50 rounded-xl p-3 flex items-center justify-between border border-slate-100">
+          <div className="flex items-center gap-3 overflow-hidden">
+            {userProfile.picture ? (
+              <img src={userProfile.picture} alt="Profile" className="w-8 h-8 rounded-full border border-slate-200 flex-shrink-0 hidden md:block" />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 text-xs font-bold hidden md:flex">
+                {userProfile.name.charAt(0).toUpperCase()}
+              </div>
+            )}
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-slate-900 truncate">{userProfile.name}</p>
+              <p className="text-[10px] text-slate-500 truncate">{userProfile.email}</p>
+            </div>
+          </div>
+          <button
+            onClick={handleLogout}
+            className="text-slate-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded-md transition-colors flex-shrink-0"
+            title="Sign Out"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Term Selector */}
+        <TermSelector
+          selectedAcademicYear={selectedAcademicYear}
+          selectedSemester={selectedSemester}
+          onTermChange={handleTermChange}
+        />
+
+        {/* Subject Manager */}
+        <SubjectManager
+          savedSubjectsForTerm={savedSubjectsForSelectedTerm}
+          onAddSubject={handleAddSubject}
+          onDeleteSubject={handleDeleteSubject}
+        />
+
+        {/* Status Chart (Hidden on mobile sidebar to save vertical space, shown in main content instead) */}
+        <div className="hidden md:block">
+          <StatusChart tasks={tasksForSelectedTerm} />
+        </div>
+
+        <div className="flex-1 hidden md:block" />
+        <div className="text-[10px] text-slate-300 text-center pb-1 hidden md:block">
+          Synced with Google Sheets
+        </div>
+      </aside>
+
+      {/* Overlay to catch clicks and close mobile menu */}
+      {isMobileMenuOpen && (
+        <div 
+          className="fixed inset-0 bg-slate-900/20 z-[5] md:hidden backdrop-blur-sm" 
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+
+      {/* ═══════════ MAIN CONTENT AREA ═══════════ */}
+      <main className="flex-1 min-w-0 p-4 sm:p-6 md:p-8 overflow-y-auto md:min-h-screen">
+
+        {/* Error Banner */}
+        {error && (
+          <div className="mb-6 px-4 py-3 rounded-xl bg-red-50 border border-red-100 flex items-center justify-between fade-in">
+            <p className="text-red-600 text-sm">{error}</p>
+            <button
+              onClick={() => setError(null)}
+              className="text-red-400 hover:text-red-600 ml-3 transition-colors p-1 rounded-md hover:bg-red-100"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
+            </button>
+          </div>
+        )}
+
+        {/* Main Header — Title + Action button */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 fade-in">
+          <div>
+            <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+              Year {selectedAcademicYear} · Semester {selectedSemester}
+            </h2>
+            <p className="text-sm text-slate-500 mt-0.5">
+              {tasksForSelectedTerm.length} task{tasksForSelectedTerm.length !== 1 ? 's' : ''} in this term
+            </p>
+          </div>
+
+          <button
+            onClick={() => setShowTaskForm(true)}
+            className="w-full sm:w-auto px-5 py-2.5 rounded-xl text-sm font-semibold text-white
+                       bg-slate-900 hover:bg-slate-800 focus:ring-4 focus:ring-slate-200
+                       shadow-sm hover:shadow-md transition-all duration-200 active:scale-[0.98]
+                       flex items-center justify-center gap-2"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+            </svg>
+            New Task
+          </button>
+        </div>
+
+        {/* Status Summary Cards (Stacks on mobile) */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 fade-in">
+          <StatusSummaryCards tasks={tasksForSelectedTerm} />
+        </div>
+
+        {/* Task Table */}
+        <div className="fade-in bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden mb-6">
+          <TaskTable
+            tasks={tasksForSelectedTerm}
+            onStatusChange={handleStatusChange}
+            onDelete={handleDeleteTask}
+            isLoading={isLoading}
+          />
+        </div>
+
+        {/* Mobile-only Status Chart */}
+        <div className="md:hidden">
+          <StatusChart tasks={tasksForSelectedTerm} />
+          <div className="text-[10px] text-slate-300 text-center mt-6">
+            Synced with Google Sheets
+          </div>
+        </div>
+
+      </main>
+
+      {/* ═══════════ TASK FORM MODAL ═══════════ */}
+      {showTaskForm && (
         <TaskForm
           savedSubjectsList={savedSubjectsForSelectedTerm}
           onAdd={handleAddTask}
-          onClose={() => setShowForm(false)}
+          onClose={() => setShowTaskForm(false)}
           isLoading={isSyncing}
         />
       )}

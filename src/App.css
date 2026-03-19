@@ -1,9 +1,14 @@
-/* ===== Task Manager Minimalist Styles ===== */
+/* ===== Dashboard Minimalist Styles ===== */
 
-/* Custom scrollbar for a cleaner look */
+/*
+ * WHY custom scrollbar:
+ * The default browser scrollbar is thick and visually distracting.
+ * A slim, translucent scrollbar keeps the dashboard looking clean
+ * without sacrificing scroll functionality.
+ */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
@@ -12,32 +17,39 @@
 
 ::-webkit-scrollbar-thumb {
   background: #cbd5e1;
-  border-radius: 4px;
+  border-radius: 999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
 
-/* Smooth Animations */
+/* ─── Entrance Animations ─────────────────────────────────────── */
+
 .fade-in {
-  animation: fadeIn 0.4s ease-out forwards;
+  animation: fadeIn 0.35s ease-out forwards;
 }
 
 @keyframes fadeIn {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(6px);
   }
-
   to {
     opacity: 1;
     transform: translateY(0);
   }
 }
 
+/* ─── Modal System ────────────────────────────────────────────── */
+/*
+ * WHY a two-part animation (overlay + content):
+ * The overlay dims the background while the content card scales in.
+ * This layered approach gives a perceived depth that feels native.
+ */
+
 .modal-overlay {
-  animation: overlayFadeIn 0.3s ease-out forwards;
+  animation: overlayFadeIn 0.25s ease-out forwards;
 }
 
 @keyframes overlayFadeIn {
@@ -45,7 +57,6 @@
     opacity: 0;
     backdrop-filter: blur(0px);
   }
-
   to {
     opacity: 1;
     backdrop-filter: blur(4px);
@@ -53,17 +64,28 @@
 }
 
 .modal-content {
-  animation: modalSlideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: modalSlideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 @keyframes modalSlideIn {
   from {
     opacity: 0;
-    transform: scale(0.96) translateY(12px);
+    transform: scale(0.97) translateY(10px);
   }
-
   to {
     opacity: 1;
     transform: scale(1) translateY(0);
   }
+}
+
+/* ─── Dashboard Sidebar ───────────────────────────────────────── */
+/*
+ * WHY fixed sidebar with min-height:
+ * On a single-screen dashboard, the sidebar must stay visible
+ * while the main content scrolls. min-h-screen keeps it full-height.
+ */
+
+.dashboard-sidebar {
+  scrollbar-width: thin;
+  scrollbar-color: #e2e8f0 transparent;
 }

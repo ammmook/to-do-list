@@ -1,19 +1,22 @@
 const API_URL = import.meta.env.VITE_GOOGLE_SHEET_API_URL;
 
 /**
- * Google Apps Script CORS workaround:
- * All operations use GET requests with URL parameters.
- *
- * This service handles two data types:
- *   1. Tasks — the main todo items
- *   2. Subjects — saved subject names per academic term
+ * Google Apps Script API Service
+ * 
+ * Multi-User Data Ownership:
+ * Every API request MUST now include the `ownerEmail` of the logged-in user.
+ * This instructs the backend to filter data and bind new records to this exact email.
  */
 
 // ─── Task API ────────────────────────────────────────────────────
 
-export async function fetchTodos() {
+export async function fetchTodosForUser(userEmail) {
   try {
-    const url = `${API_URL}?action=getAll`;
+    const params = new URLSearchParams({
+      action: 'getAll',
+      ownerEmail: userEmail
+    });
+    const url = `${API_URL}?${params.toString()}`;
     const response = await fetch(url);
     const data = await response.json();
     if (data.error) throw new Error(data.error);
@@ -24,7 +27,7 @@ export async function fetchTodos() {
   }
 }
 
-export async function addTodo(formData) {
+export async function addTodoWithUserEmail(formData, userEmail) {
   try {
     const params = new URLSearchParams({
       action: 'add',
@@ -36,6 +39,7 @@ export async function addTodo(formData) {
       note: formData.note || '',
       academicYear: String(formData.academicYear || ''),
       semester: String(formData.semester || ''),
+      ownerEmail: userEmail // Explicitly binding data to user
     });
     const url = `${API_URL}?${params.toString()}`;
     const response = await fetch(url);
@@ -48,11 +52,12 @@ export async function addTodo(formData) {
   }
 }
 
-export async function updateTodo(id, updates) {
+export async function updateTodoWithUserEmail(id, updates, userEmail) {
   try {
     const params = new URLSearchParams({
       action: 'update',
       id: id,
+      ownerEmail: userEmail
     });
     if (updates.subject !== undefined) params.set('subject', updates.subject);
     if (updates.task !== undefined) params.set('task', updates.task);
@@ -72,11 +77,12 @@ export async function updateTodo(id, updates) {
   }
 }
 
-export async function deleteTodo(id) {
+export async function deleteTodoWithUserEmail(id, userEmail) {
   try {
     const params = new URLSearchParams({
       action: 'delete',
       id: id,
+      ownerEmail: userEmail
     });
     const url = `${API_URL}?${params.toString()}`;
     const response = await fetch(url);
@@ -90,12 +96,14 @@ export async function deleteTodo(id) {
 }
 
 // ─── Subject API ─────────────────────────────────────────────────
-// Subjects are stored in a separate "Subjects" sheet tab,
-// scoped by academicYear + semester.
 
-export async function fetchSavedSubjects() {
+export async function fetchSavedSubjectsForUser(userEmail) {
   try {
-    const url = `${API_URL}?action=getSubjects`;
+    const params = new URLSearchParams({
+      action: 'getSubjects',
+      ownerEmail: userEmail
+    });
+    const url = `${API_URL}?${params.toString()}`;
     const response = await fetch(url);
     const data = await response.json();
     if (data.error) throw new Error(data.error);
@@ -106,13 +114,14 @@ export async function fetchSavedSubjects() {
   }
 }
 
-export async function saveNewSubject(subjectName, academicYear, semester) {
+export async function saveNewSubjectWithUserEmail(subjectName, academicYear, semester, userEmail) {
   try {
     const params = new URLSearchParams({
       action: 'addSubject',
       name: subjectName,
       academicYear: String(academicYear),
       semester: String(semester),
+      ownerEmail: userEmail // Explicitly binding data to user
     });
     const url = `${API_URL}?${params.toString()}`;
     const response = await fetch(url);
@@ -125,11 +134,12 @@ export async function saveNewSubject(subjectName, academicYear, semester) {
   }
 }
 
-export async function removeSubject(subjectId) {
+export async function removeSubjectWithUserEmail(subjectId, userEmail) {
   try {
     const params = new URLSearchParams({
       action: 'deleteSubject',
       id: subjectId,
+      ownerEmail: userEmail
     });
     const url = `${API_URL}?${params.toString()}`;
     const response = await fetch(url);

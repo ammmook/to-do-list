@@ -1,94 +1,118 @@
+/**
+ * StatusChart — Lightweight donut chart showing task status distribution.
+ *
+ * WHY SVG donut instead of a chart library:
+ * The donut only shows 3 segments, so a full chart library is overkill.
+ * Raw SVG keeps the bundle tiny and gives full control over styling.
+ */
 function StatusChart({ tasks }) {
-  const total = tasks.length || 1;
-  const done = tasks.filter(t => t.status === 'Done').length;
-  const pending = tasks.filter(t => t.status === 'Pending').length;
-  const notStarted = tasks.filter(t => t.status === 'Not Started').length;
+  const totalTaskCount = tasks.length;
+  const emptyState = totalTaskCount === 0;
 
-  const donePercent = (done / total) * 100;
-  const pendingPercent = (pending / total) * 100;
-  const notStartedPercent = (notStarted / total) * 100;
+  const doneCount = tasks.filter(t => t.status === 'Done').length;
+  const pendingCount = tasks.filter(t => t.status === 'Pending').length;
+  const notStartedCount = tasks.filter(t => t.status === 'Not Started').length;
 
-  // SVG donut chart
-  const radius = 52;
+  // Use 1 as denominator for empty state to avoid division by zero
+  const divisor = emptyState ? 1 : totalTaskCount;
+
+  const donePercent = (doneCount / divisor) * 100;
+  const pendingPercent = (pendingCount / divisor) * 100;
+  const notStartedPercent = (notStartedCount / divisor) * 100;
+
+  // SVG donut calculations
+  const radius = 42;
   const circumference = 2 * Math.PI * radius;
 
-  const doneOffset = 0;
   const doneDash = (donePercent / 100) * circumference;
-
-  const pendingOffset = doneDash;
   const pendingDash = (pendingPercent / 100) * circumference;
-
-  const notStartedOffset = pendingOffset + pendingDash;
   const notStartedDash = (notStartedPercent / 100) * circumference;
 
+  const doneOffset = 0;
+  const pendingOffset = doneDash;
+  const notStartedOffset = pendingOffset + pendingDash;
+
+  const legendItems = [
+    { label: 'Done', percent: donePercent, colorClass: 'bg-emerald-400' },
+    { label: 'Pending', percent: pendingPercent, colorClass: 'bg-amber-300' },
+    { label: 'Not Started', percent: notStartedPercent, colorClass: 'bg-rose-300' },
+  ];
+
   return (
-    <div className="flex items-center gap-4">
-      <div className="relative">
-        <svg width="140" height="140" viewBox="0 0 120 120">
-          {/* Background circle */}
-          <circle cx="60" cy="60" r={radius} fill="none" stroke="#f3f4f6" strokeWidth="14" />
-          
-          {/* Done segment - green */}
-          {done > 0 && (
-            <circle
-              cx="60" cy="60" r={radius}
-              fill="none"
-              stroke="#86efac"
-              strokeWidth="14"
-              strokeDasharray={`${doneDash} ${circumference - doneDash}`}
-              strokeDashoffset={-doneOffset}
-              transform="rotate(-90 60 60)"
-              className="transition-all duration-500"
-            />
-          )}
-          
-          {/* Pending segment - yellow */}
-          {pending > 0 && (
-            <circle
-              cx="60" cy="60" r={radius}
-              fill="none"
-              stroke="#fde68a"
-              strokeWidth="14"
-              strokeDasharray={`${pendingDash} ${circumference - pendingDash}`}
-              strokeDashoffset={-pendingOffset}
-              transform="rotate(-90 60 60)"
-              className="transition-all duration-500"
-            />
-          )}
-          
-          {/* Not Started segment - red/pink */}
-          {notStarted > 0 && (
-            <circle
-              cx="60" cy="60" r={radius}
-              fill="none"
-              stroke="#fda4af"
-              strokeWidth="14"
-              strokeDasharray={`${notStartedDash} ${circumference - notStartedDash}`}
-              strokeDashoffset={-notStartedOffset}
-              transform="rotate(-90 60 60)"
-              className="transition-all duration-500"
-            />
-          )}
+    <div className="bg-white rounded-xl border border-slate-200/80 p-4 shadow-sm">
+      <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-4">Overview</h3>
 
-          {/* Center text */}
-          <text x="60" y="56" textAnchor="middle" className="text-xs fill-gray-400">Status</text>
-          <text x="60" y="72" textAnchor="middle" className="text-sm font-semibold fill-gray-600">{total === 1 && tasks.length === 0 ? 0 : total}</text>
-        </svg>
-      </div>
+      <div className="flex flex-col items-center gap-4">
+        {/* Donut Chart */}
+        <div className="relative">
+          <svg width="110" height="110" viewBox="0 0 100 100">
+            {/* Background ring */}
+            <circle cx="50" cy="50" r={radius} fill="none" stroke="#f1f5f9" strokeWidth="12" />
 
-      {/* Legend */}
-      <div className="flex flex-col gap-2 text-xs">
-        <div className="flex items-center gap-2">
-          <span className="w-3 h-3 rounded-full bg-green-300 inline-block"></span>
-          <span className="text-gray-500">Done <b className="text-gray-700">{donePercent.toFixed(1)}%</b></span>
+            {/* Done segment — green */}
+            {doneCount > 0 && (
+              <circle
+                cx="50" cy="50" r={radius}
+                fill="none"
+                stroke="#6ee7b7"
+                strokeWidth="12"
+                strokeLinecap="round"
+                strokeDasharray={`${doneDash} ${circumference - doneDash}`}
+                strokeDashoffset={-doneOffset}
+                transform="rotate(-90 50 50)"
+                className="transition-all duration-500"
+              />
+            )}
+
+            {/* Pending segment — yellow */}
+            {pendingCount > 0 && (
+              <circle
+                cx="50" cy="50" r={radius}
+                fill="none"
+                stroke="#fcd34d"
+                strokeWidth="12"
+                strokeLinecap="round"
+                strokeDasharray={`${pendingDash} ${circumference - pendingDash}`}
+                strokeDashoffset={-pendingOffset}
+                transform="rotate(-90 50 50)"
+                className="transition-all duration-500"
+              />
+            )}
+
+            {/* Not Started segment — rose */}
+            {notStartedCount > 0 && (
+              <circle
+                cx="50" cy="50" r={radius}
+                fill="none"
+                stroke="#fda4af"
+                strokeWidth="12"
+                strokeLinecap="round"
+                strokeDasharray={`${notStartedDash} ${circumference - notStartedDash}`}
+                strokeDashoffset={-notStartedOffset}
+                transform="rotate(-90 50 50)"
+                className="transition-all duration-500"
+              />
+            )}
+
+            {/* Center text */}
+            <text x="50" y="46" textAnchor="middle" className="text-[10px] fill-slate-400">Total</text>
+            <text x="50" y="60" textAnchor="middle" className="text-sm font-bold fill-slate-700">
+              {totalTaskCount}
+            </text>
+          </svg>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="w-3 h-3 rounded-full bg-yellow-200 inline-block"></span>
-          <span className="text-gray-500">Pending <b className="text-gray-700">{pendingPercent.toFixed(1)}%</b></span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="w-3 h-3 rounded-full bg-red-300 inline-block"></span>
-          <span className="text-gray-500">Not Started <b className="text-gray-700">{notStartedPercent.toFixed(1)}%</b></span>
+
+        {/* Legend */}
+        <div className="flex flex-col gap-1.5 w-full">
+          {legendItems.map((item) => (
+            <div key={item.label} className="flex items-center justify-between text-[11px]">
+              <div className="flex items-center gap-2">
+                <span className={`w-2.5 h-2.5 rounded-full ${item.colorClass}`} />
+                <span className="text-slate-500">{item.label}</span>
+              </div>
+              <span className="text-slate-700 font-semibold">{item.percent.toFixed(0)}%</span>
+            </div>
+          ))}
         </div>
       </div>
     </div>
