@@ -5,16 +5,45 @@
 // - Execute as: Me
 // - Who has access: Anyone
 //
-// IMPORTANT: Your Google Sheet should have these column headers in row 1:
-// id | subject | task | category | deadline | priority | status | note | createdAt
-// (or leave it empty — the script will create headers automatically)
+// This script manages TWO sheet tabs:
+//   1. "Sheet1" — Tasks data
+//   2. "Subjects" — Saved subject names per academic term
+//
+// The "Subjects" tab will be auto-created on first use.
 
-const SHEET_NAME = 'Sheet1'; // Change this if your sheet tab has a different name
+var TASKS_SHEET_NAME = 'Sheet1';
+var SUBJECTS_SHEET_NAME = 'Subjects';
+
+// ─── Column indices (0-based) for Tasks sheet ────────────────────
+var TASK_COL = {
+  ID: 0,
+  SUBJECT: 1,
+  TASK: 2,
+  CATEGORY: 3,
+  DEADLINE: 4,
+  PRIORITY: 5,
+  STATUS: 6,
+  NOTE: 7,
+  CREATED_AT: 8,
+  ACADEMIC_YEAR: 9,
+  SEMESTER: 10
+};
+
+// ─── Column indices (0-based) for Subjects sheet ─────────────────
+var SUBJECT_COL = {
+  ID: 0,
+  NAME: 1,
+  ACADEMIC_YEAR: 2,
+  SEMESTER: 3
+};
+
+// ─── Router ──────────────────────────────────────────────────────
 
 function doGet(e) {
   var action = e.parameter.action;
 
   switch (action) {
+    // Task actions
     case 'getAll':
       return getAllTasks();
     case 'add':
@@ -23,6 +52,15 @@ function doGet(e) {
       return updateTask(e.parameter.id, e.parameter);
     case 'delete':
       return deleteTask(e.parameter.id);
+
+    // Subject actions
+    case 'getSubjects':
+      return getAllSubjects();
+    case 'addSubject':
+      return addSubject(e.parameter);
+    case 'deleteSubject':
+      return deleteSubject(e.parameter.id);
+
     default:
       return jsonResponse({ error: 'Unknown action: ' + action });
   }
@@ -33,15 +71,45 @@ function doPost(e) {
   return doGet({ parameter: body });
 }
 
-function ensureHeaders(sheet) {
-  if (sheet.getLastRow() === 0) {
-    sheet.appendRow(['id', 'subject', 'task', 'category', 'deadline', 'priority', 'status', 'note', 'createdAt']);
+// ─── Sheet Helpers ───────────────────────────────────────────────
+
+function getOrCreateSheet(sheetName, headers) {
+  var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = spreadsheet.getSheetByName(sheetName);
+
+  // Auto-create the sheet tab if it doesn't exist yet
+  if (!sheet) {
+    sheet = spreadsheet.insertSheet(sheetName);
+    sheet.appendRow(headers);
+    return sheet;
   }
+
+  // Ensure headers if the sheet is empty
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(headers);
+  }
+
+  return sheet;
 }
 
+function getTasksSheet() {
+  return getOrCreateSheet(TASKS_SHEET_NAME, [
+    'id', 'subject', 'task', 'category', 'deadline',
+    'priority', 'status', 'note', 'createdAt',
+    'academicYear', 'semester'
+  ]);
+}
+
+function getSubjectsSheet() {
+  return getOrCreateSheet(SUBJECTS_SHEET_NAME, [
+    'id', 'name', 'academicYear', 'semester'
+  ]);
+}
+
+// ─── Task CRUD ───────────────────────────────────────────────────
+
 function getAllTasks() {
-  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
-  ensureHeaders(sheet);
+  var sheet = getTasksSheet();
 
   if (sheet.getLastRow() <= 1) {
     return jsonResponse({ data: [] });
@@ -51,17 +119,19 @@ function getAllTasks() {
   var tasks = [];
 
   for (var i = 1; i < data.length; i++) {
-    if (data[i][0] === '') continue;
+    if (data[i][TASK_COL.ID] === '') continue;
     tasks.push({
-      id: String(data[i][0]),
-      subject: String(data[i][1]),
-      task: String(data[i][2]),
-      category: String(data[i][3]),
-      deadline: String(data[i][4]),
-      priority: String(data[i][5]),
-      status: String(data[i][6]),
-      note: String(data[i][7]),
-      createdAt: String(data[i][8]),
+      id: String(data[i][TASK_COL.ID]),
+      subject: String(data[i][TASK_COL.SUBJECT]),
+      task: String(data[i][TASK_COL.TASK]),
+      category: String(data[i][TASK_COL.CATEGORY]),
+      deadline: String(data[i][TASK_COL.DEADLINE]),
+      priority: String(data[i][TASK_COL.PRIORITY]),
+      status: String(data[i][TASK_COL.STATUS]),
+      note: String(data[i][TASK_COL.NOTE]),
+      createdAt: String(data[i][TASK_COL.CREATED_AT]),
+      academicYear: String(data[i][TASK_COL.ACADEMIC_YEAR] || ''),
+      semester: String(data[i][TASK_COL.SEMESTER] || ''),
     });
   }
 
@@ -70,8 +140,7 @@ function getAllTasks() {
 }
 
 function addTask(params) {
-  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
-  ensureHeaders(sheet);
+  var sheet = getTasksSheet();
 
   var id = Utilities.getUuid();
   var createdAt = new Date().toISOString();
@@ -82,10 +151,12 @@ function addTask(params) {
     params.task || '',
     params.category || '',
     params.deadline || '',
-    params.priority || 'Medium',
+    '',                           // priority — auto-calculated on client
     params.status || 'Not Started',
     params.note || '',
-    createdAt
+    createdAt,
+    params.academicYear || '',
+    params.semester || ''
   ]);
 
   return jsonResponse({
@@ -95,40 +166,42 @@ function addTask(params) {
       task: params.task || '',
       category: params.category || '',
       deadline: params.deadline || '',
-      priority: params.priority || 'Medium',
+      priority: '',
       status: params.status || 'Not Started',
       note: params.note || '',
-      createdAt: createdAt
+      createdAt: createdAt,
+      academicYear: params.academicYear || '',
+      semester: params.semester || ''
     }
   });
 }
 
 function updateTask(id, params) {
-  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+  var sheet = getTasksSheet();
   var data = sheet.getDataRange().getValues();
 
-  // Column mapping: 0=id, 1=subject, 2=task, 3=category, 4=deadline, 5=priority, 6=status, 7=note, 8=createdAt
   for (var i = 1; i < data.length; i++) {
-    if (String(data[i][0]) === String(id)) {
-      if (params.subject !== undefined && params.subject !== null) sheet.getRange(i + 1, 2).setValue(params.subject);
-      if (params.task !== undefined && params.task !== null) sheet.getRange(i + 1, 3).setValue(params.task);
-      if (params.category !== undefined && params.category !== null) sheet.getRange(i + 1, 4).setValue(params.category);
-      if (params.deadline !== undefined && params.deadline !== null) sheet.getRange(i + 1, 5).setValue(params.deadline);
-      if (params.priority !== undefined && params.priority !== null) sheet.getRange(i + 1, 6).setValue(params.priority);
-      if (params.status !== undefined && params.status !== null) sheet.getRange(i + 1, 7).setValue(params.status);
-      if (params.note !== undefined && params.note !== null) sheet.getRange(i + 1, 8).setValue(params.note);
+    if (String(data[i][TASK_COL.ID]) === String(id)) {
+      if (params.subject != null) sheet.getRange(i + 1, TASK_COL.SUBJECT + 1).setValue(params.subject);
+      if (params.task != null) sheet.getRange(i + 1, TASK_COL.TASK + 1).setValue(params.task);
+      if (params.category != null) sheet.getRange(i + 1, TASK_COL.CATEGORY + 1).setValue(params.category);
+      if (params.deadline != null) sheet.getRange(i + 1, TASK_COL.DEADLINE + 1).setValue(params.deadline);
+      if (params.status != null) sheet.getRange(i + 1, TASK_COL.STATUS + 1).setValue(params.status);
+      if (params.note != null) sheet.getRange(i + 1, TASK_COL.NOTE + 1).setValue(params.note);
 
       return jsonResponse({
         data: {
           id: String(id),
-          subject: params.subject !== undefined ? String(params.subject) : String(data[i][1]),
-          task: params.task !== undefined ? String(params.task) : String(data[i][2]),
-          category: params.category !== undefined ? String(params.category) : String(data[i][3]),
-          deadline: params.deadline !== undefined ? String(params.deadline) : String(data[i][4]),
-          priority: params.priority !== undefined ? String(params.priority) : String(data[i][5]),
-          status: params.status !== undefined ? String(params.status) : String(data[i][6]),
-          note: params.note !== undefined ? String(params.note) : String(data[i][7]),
-          createdAt: String(data[i][8])
+          subject: params.subject != null ? String(params.subject) : String(data[i][TASK_COL.SUBJECT]),
+          task: params.task != null ? String(params.task) : String(data[i][TASK_COL.TASK]),
+          category: params.category != null ? String(params.category) : String(data[i][TASK_COL.CATEGORY]),
+          deadline: params.deadline != null ? String(params.deadline) : String(data[i][TASK_COL.DEADLINE]),
+          priority: String(data[i][TASK_COL.PRIORITY]),
+          status: params.status != null ? String(params.status) : String(data[i][TASK_COL.STATUS]),
+          note: params.note != null ? String(params.note) : String(data[i][TASK_COL.NOTE]),
+          createdAt: String(data[i][TASK_COL.CREATED_AT]),
+          academicYear: String(data[i][TASK_COL.ACADEMIC_YEAR] || ''),
+          semester: String(data[i][TASK_COL.SEMESTER] || '')
         }
       });
     }
@@ -138,11 +211,11 @@ function updateTask(id, params) {
 }
 
 function deleteTask(id) {
-  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+  var sheet = getTasksSheet();
   var data = sheet.getDataRange().getValues();
 
   for (var i = 1; i < data.length; i++) {
-    if (String(data[i][0]) === String(id)) {
+    if (String(data[i][TASK_COL.ID]) === String(id)) {
       sheet.deleteRow(i + 1);
       return jsonResponse({ success: true });
     }
@@ -150,6 +223,71 @@ function deleteTask(id) {
 
   return jsonResponse({ error: 'Task not found' });
 }
+
+// ─── Subject CRUD ────────────────────────────────────────────────
+// Subjects are stored in a separate "Subjects" sheet tab.
+// Each subject is scoped to a specific academicYear + semester.
+
+function getAllSubjects() {
+  var sheet = getSubjectsSheet();
+
+  if (sheet.getLastRow() <= 1) {
+    return jsonResponse({ data: [] });
+  }
+
+  var data = sheet.getDataRange().getValues();
+  var subjects = [];
+
+  for (var i = 1; i < data.length; i++) {
+    if (data[i][SUBJECT_COL.ID] === '') continue;
+    subjects.push({
+      id: String(data[i][SUBJECT_COL.ID]),
+      name: String(data[i][SUBJECT_COL.NAME]),
+      academicYear: String(data[i][SUBJECT_COL.ACADEMIC_YEAR] || ''),
+      semester: String(data[i][SUBJECT_COL.SEMESTER] || ''),
+    });
+  }
+
+  return jsonResponse({ data: subjects });
+}
+
+function addSubject(params) {
+  var sheet = getSubjectsSheet();
+
+  var id = Utilities.getUuid();
+
+  sheet.appendRow([
+    id,
+    params.name || '',
+    params.academicYear || '',
+    params.semester || ''
+  ]);
+
+  return jsonResponse({
+    data: {
+      id: id,
+      name: params.name || '',
+      academicYear: params.academicYear || '',
+      semester: params.semester || ''
+    }
+  });
+}
+
+function deleteSubject(id) {
+  var sheet = getSubjectsSheet();
+  var data = sheet.getDataRange().getValues();
+
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][SUBJECT_COL.ID]) === String(id)) {
+      sheet.deleteRow(i + 1);
+      return jsonResponse({ success: true });
+    }
+  }
+
+  return jsonResponse({ error: 'Subject not found' });
+}
+
+// ─── Utility ─────────────────────────────────────────────────────
 
 function jsonResponse(data) {
   return ContentService

@@ -1,30 +1,61 @@
 import { useState } from 'react';
 
-function TaskForm({ onAdd, onClose, isLoading }) {
-  const [form, setForm] = useState({
-    subject: '',
-    task: '',
-    category: 'Exam',
-    deadline: '',
-    priority: 'Medium',
-    status: 'Not Started',
-    note: '',
-  });
+/**
+ * TaskForm — Modal form for creating a new task.
+ *
+ * The Subject field is a DROPDOWN populated ONLY with subjects that
+ * the user previously saved via the SubjectManager sidebar.
+ * This ensures a clean two-step flow: add subjects first, then create tasks.
+ *
+ * Priority is auto-calculated from the deadline on the client side,
+ * so it does NOT appear as a form field.
+ *
+ * @param {Array}    savedSubjectsList - Subjects saved for the current term
+ * @param {Function} onAdd             - Callback with form data
+ * @param {Function} onClose           - Close modal callback
+ * @param {boolean}  isLoading         - Disables form during sync
+ */
+function TaskForm({ savedSubjectsList, onAdd, onClose, isLoading }) {
+  const hasNoSavedSubjects = savedSubjectsList.length === 0;
+  const defaultSelectedSubject = hasNoSavedSubjects ? '' : savedSubjectsList[0].name;
 
-  const handleChange = (field, value) => {
-    setForm(prev => ({ ...prev, [field]: value }));
-  };
+  const [selectedSubjectForTask, setSelectedSubjectForTask] = useState(defaultSelectedSubject);
+  const [newTaskDescription, setNewTaskDescription] = useState('');
+  const [newTaskCategory, setNewTaskCategory] = useState('Exam');
+  const [newTaskDeadline, setNewTaskDeadline] = useState('');
+  const [newTaskStatus, setNewTaskStatus] = useState('Not Started');
+  const [newTaskNote, setNewTaskNote] = useState('');
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (form.subject.trim() && form.task.trim() && !isLoading) {
-      onAdd(form);
+  const handleSubmit = (event) => {
+    event.preventDefault();
+
+    const isSubjectValid = selectedSubjectForTask.trim() !== '';
+    const isTaskValid = newTaskDescription.trim() !== '';
+
+    if (isSubjectValid && isTaskValid && !isLoading) {
+      const formData = {
+        subject: selectedSubjectForTask,
+        task: newTaskDescription.trim(),
+        category: newTaskCategory,
+        deadline: newTaskDeadline,
+        status: newTaskStatus,
+        note: newTaskNote.trim(),
+      };
+      onAdd(formData);
       onClose();
     }
   };
 
-  // Utility class for inputs to keep code clean and uniform
-  const inputClassName = "w-full px-3 py-2 rounded-md border border-slate-300 text-sm text-slate-900 focus:outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500 placeholder-slate-400 transition-all bg-white";
+  const inputClassName =
+    'w-full px-3 py-2 rounded-md border border-slate-300 text-sm text-slate-900 ' +
+    'focus:outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500 ' +
+    'placeholder-slate-400 transition-all bg-white';
+
+  const isSubmitDisabled =
+    !selectedSubjectForTask.trim() ||
+    !newTaskDescription.trim() ||
+    isLoading ||
+    hasNoSavedSubjects;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center modal-overlay bg-slate-900/30 backdrop-blur-sm" onClick={onClose}>
@@ -42,35 +73,58 @@ function TaskForm({ onAdd, onClose, isLoading }) {
           </button>
         </div>
 
+        {/* Warn if no subjects exist yet — user needs to add subjects first */}
+        {hasNoSavedSubjects && (
+          <div className="mb-4 px-3 py-2.5 rounded-md bg-amber-50 border border-amber-200 text-amber-700 text-xs leading-relaxed">
+            <strong>No subjects saved yet.</strong> Please add subjects in the sidebar first before creating a task.
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-5">
+          {/* Subject — dropdown from savedSubjectsList */}
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Subject <span className="text-red-500">*</span></label>
-            <input
-              type="text"
-              value={form.subject}
-              onChange={e => handleChange('subject', e.target.value)}
-              placeholder="e.g. Database Systems"
-              required
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">
+              Subject <span className="text-red-500">*</span>
+            </label>
+            <select
+              value={selectedSubjectForTask}
+              onChange={e => setSelectedSubjectForTask(e.target.value)}
+              disabled={hasNoSavedSubjects}
               className={inputClassName}
-            />
+            >
+              {hasNoSavedSubjects && (
+                <option value="">— Add subjects in the sidebar first —</option>
+              )}
+              {savedSubjectsList.map((subject) => (
+                <option key={subject.id} value={subject.name}>{subject.name}</option>
+              ))}
+            </select>
           </div>
 
+          {/* Task description */}
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">Task <span className="text-red-500">*</span></label>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">
+              Task <span className="text-red-500">*</span>
+            </label>
             <input
               type="text"
-              value={form.task}
-              onChange={e => handleChange('task', e.target.value)}
+              value={newTaskDescription}
+              onChange={e => setNewTaskDescription(e.target.value)}
               placeholder="e.g. Complete chapter 4 assignment"
               required
               className={inputClassName}
             />
           </div>
 
+          {/* Category + Deadline */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">Category</label>
-              <select value={form.category} onChange={e => handleChange('category', e.target.value)} className={inputClassName}>
+              <select
+                value={newTaskCategory}
+                onChange={e => setNewTaskCategory(e.target.value)}
+                className={inputClassName}
+              >
                 <option value="Exam">Exam</option>
                 <option value="Project">Project</option>
                 <option value="Homework">Homework</option>
@@ -82,43 +136,47 @@ function TaskForm({ onAdd, onClose, isLoading }) {
               <label className="block text-sm font-medium text-slate-700 mb-1.5">Deadline</label>
               <input
                 type="date"
-                value={form.deadline}
-                onChange={e => handleChange('deadline', e.target.value)}
+                value={newTaskDeadline}
+                onChange={e => setNewTaskDeadline(e.target.value)}
                 className={inputClassName}
               />
             </div>
           </div>
 
+          {/* Status only — Priority is auto-calculated, not user-selectable */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Priority</label>
-              <select value={form.priority} onChange={e => handleChange('priority', e.target.value)} className={inputClassName}>
-                <option value="Low">Low</option>
-                <option value="Medium">Medium</option>
-                <option value="High">High</option>
-              </select>
-            </div>
-            <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">Status</label>
-              <select value={form.status} onChange={e => handleChange('status', e.target.value)} className={inputClassName}>
+              <select
+                value={newTaskStatus}
+                onChange={e => setNewTaskStatus(e.target.value)}
+                className={inputClassName}
+              >
                 <option value="Not Started">Not Started</option>
                 <option value="Pending">Pending</option>
                 <option value="Done">Done</option>
               </select>
             </div>
+            <div className="flex items-end pb-1">
+              <p className="text-xs text-slate-400 italic">
+                Priority is auto-calculated from the deadline.
+              </p>
+            </div>
           </div>
 
+          {/* Note */}
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Note</label>
             <textarea
-              value={form.note}
-              onChange={e => handleChange('note', e.target.value)}
+              value={newTaskNote}
+              onChange={e => setNewTaskNote(e.target.value)}
               placeholder="Add any extra details here..."
               rows={2}
               className={`${inputClassName} resize-none`}
             />
           </div>
 
+          {/* Actions */}
           <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 mt-2">
             <button
               type="button"
@@ -129,7 +187,7 @@ function TaskForm({ onAdd, onClose, isLoading }) {
             </button>
             <button
               type="submit"
-              disabled={!form.subject.trim() || !form.task.trim() || isLoading}
+              disabled={isSubmitDisabled}
               className="px-4 py-2 rounded-md text-sm font-medium text-white
                          bg-slate-900 hover:bg-slate-800
                          disabled:opacity-50 disabled:cursor-not-allowed

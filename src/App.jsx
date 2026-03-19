@@ -1,26 +1,73 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import TermSelector from './components/TermSelector'
 import StatusBar from './components/StatusBar'
 import StatusChart from './components/StatusChart'
-import SubjectList from './components/SubjectList'
+import SubjectManager from './components/SubjectManager'
 import TaskTable from './components/TaskTable'
 import TaskForm from './components/TaskForm'
-import { fetchTodos, addTodo, updateTodo, deleteTodo } from './services/googleSheetsApi'
+import {
+  fetchTodos, addTodo, updateTodo, deleteTodo,
+  fetchSavedSubjects, saveNewSubject, removeSubject
+} from './services/googleSheetsApi'
+import { AVAILABLE_ACADEMIC_YEARS, AVAILABLE_SEMESTERS } from './data/academicConfig'
 import './App.css'
 
 function App() {
-  const [tasks, setTasks] = useState([])
+  // ─── Term Selection State ──────────────────────────────────────
+  // Default to the latest available year and first semester
+  const defaultAcademicYear = AVAILABLE_ACADEMIC_YEARS[AVAILABLE_ACADEMIC_YEARS.length - 1]
+  const defaultSemester = AVAILABLE_SEMESTERS[0]
+
+  const [selectedAcademicYear, setSelectedAcademicYear] = useState(defaultAcademicYear)
+  const [selectedSemester, setSelectedSemester] = useState(defaultSemester)
+
+  // ─── Task State ────────────────────────────────────────────────
+  // allTasks holds every task from Google Sheets, regardless of term.
+  // We filter it client-side based on the selected Year + Semester.
+  const [allTasks, setAllTasks] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [isSyncing, setIsSyncing] = useState(false)
   const [error, setError] = useState(null)
   const [showForm, setShowForm] = useState(false)
 
-  const loadTasks = useCallback(async () => {
+  // ─── Subject State ─────────────────────────────────────────────
+  // allSavedSubjects holds every subject from the "Subjects" sheet tab.
+  // We filter it client-side to show only subjects for the selected term.
+  const [allSavedSubjects, setAllSavedSubjects] = useState([])
+
+  // ─── Derived Data ──────────────────────────────────────────────
+
+  // Tasks isolated to the currently selected academic term
+  const tasksForSelectedTerm = useMemo(() => {
+    return allTasks.filter((task) => {
+      const matchesYear = String(task.academicYear) === String(selectedAcademicYear)
+      const matchesSemester = String(task.semester) === String(selectedSemester)
+      return matchesYear && matchesSemester
+    })
+  }, [allTasks, selectedAcademicYear, selectedSemester])
+
+  // Subjects saved for the currently selected term only
+  const savedSubjectsForSelectedTerm = useMemo(() => {
+    return allSavedSubjects.filter((subject) => {
+      const matchesYear = String(subject.academicYear) === String(selectedAcademicYear)
+      const matchesSemester = String(subject.semester) === String(selectedSemester)
+      return matchesYear && matchesSemester
+    })
+  }, [allSavedSubjects, selectedAcademicYear, selectedSemester])
+
+  // ─── Data Loading ──────────────────────────────────────────────
+  // Load both tasks and subjects in parallel on mount
+  const loadAllData = useCallback(async () => {
     try {
       setError(null)
-      const data = await fetchTodos()
-      setTasks(data)
+      const [tasksData, subjectsData] = await Promise.all([
+        fetchTodos(),
+        fetchSavedSubjects()
+      ])
+      setAllTasks(tasksData)
+      setAllSavedSubjects(subjectsData)
     } catch (err) {
-      setError('Failed to load tasks. Please check your connection.')
+      setError('Failed to load data. Please check your connection.')
       console.error(err)
     } finally {
       setIsLoading(false)
@@ -28,14 +75,29 @@ function App() {
   }, [])
 
   useEffect(() => {
-    loadTasks()
-  }, [loadTasks])
+    loadAllData()
+  }, [loadAllData])
 
-  const handleAdd = async (formData) => {
+  // ─── Term Event Handler ────────────────────────────────────────
+
+  const handleTermChange = (newYear, newSemester) => {
+    setSelectedAcademicYear(newYear)
+    setSelectedSemester(newSemester)
+  }
+
+  // ─── Task Event Handlers ───────────────────────────────────────
+
+  const handleAddTask = async (formData) => {
     setIsSyncing(true)
     try {
-      const newTask = await addTodo(formData)
-      setTasks(prev => [newTask, ...prev])
+      // Attach the currently selected term so the task is scoped correctly
+      const taskDataWithTerm = {
+        ...formData,
+        academicYear: selectedAcademicYear,
+        semester: selectedSemester,
+      }
+      const newTask = await addTodo(taskDataWithTerm)
+      setAllTasks(previousTasks => [newTask, ...previousTasks])
     } catch (err) {
       setError('Failed to add task.')
       console.error(err)
@@ -44,30 +106,63 @@ function App() {
     }
   }
 
-  const handleStatusChange = async (id, status) => {
-    const oldTasks = [...tasks]
-    setTasks(prev => prev.map(t => t.id === id ? { ...t, status } : t))
+  const handleStatusChange = async (taskId, newStatus) => {
+    const previousTasks = [...allTasks]
+    // Optimistic update: apply the change immediately for a responsive UI
+    setAllTasks(prev => prev.map(task =>
+      task.id === taskId ? { ...task, status: newStatus } : task
+    ))
     try {
-      await updateTodo(id, { status })
+      await updateTodo(taskId, { status: newStatus })
     } catch (err) {
-      setTasks(oldTasks)
+      // Revert to the previous state if the API call fails
+      setAllTasks(previousTasks)
       setError('Failed to update status.')
       console.error(err)
     }
   }
 
-  const handleDelete = async (id) => {
-    const oldTasks = [...tasks]
-    setTasks(prev => prev.filter(t => t.id !== id))
+  const handleDeleteTask = async (taskId) => {
+    const previousTasks = [...allTasks]
+    setAllTasks(prev => prev.filter(task => task.id !== taskId))
     try {
-      await deleteTodo(id)
+      await deleteTodo(taskId)
     } catch (err) {
-      setTasks(oldTasks)
+      setAllTasks(previousTasks)
       setError('Failed to delete task.')
       console.error(err)
     }
   }
 
+  // ─── Subject Event Handlers ────────────────────────────────────
+
+  const handleAddSubject = async (subjectName) => {
+    try {
+      const savedSubject = await saveNewSubject(
+        subjectName,
+        selectedAcademicYear,
+        selectedSemester
+      )
+      setAllSavedSubjects(previousSubjects => [...previousSubjects, savedSubject])
+    } catch (err) {
+      setError('Failed to save subject.')
+      console.error(err)
+    }
+  }
+
+  const handleDeleteSubject = async (subjectId) => {
+    const previousSubjects = [...allSavedSubjects]
+    setAllSavedSubjects(prev => prev.filter(s => s.id !== subjectId))
+    try {
+      await removeSubject(subjectId)
+    } catch (err) {
+      setAllSavedSubjects(previousSubjects)
+      setError('Failed to remove subject.')
+      console.error(err)
+    }
+  }
+
+  // ─── Render ────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 p-4 md:p-8 font-sans selection:bg-indigo-100 selection:text-indigo-900">
       {error && (
@@ -82,19 +177,24 @@ function App() {
       )}
 
       <div className="max-w-7xl mx-auto fade-in">
-        {/* Header Section */}
+        {/* Header: Title + Term selector + Status + New Task button */}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8 border-b border-slate-200 pb-6">
           <div>
             <h1 className="text-3xl font-semibold tracking-tight text-slate-900 mb-1">Tasks</h1>
-            <p className="text-slate-500 text-sm">Manage your daily priorities seamlessly.</p>
+            <p className="text-slate-500 text-sm">Manage your academic priorities seamlessly.</p>
           </div>
 
-          <div className="flex items-center gap-4">
-            <StatusBar tasks={tasks} />
+          <div className="flex flex-wrap items-center gap-4">
+            <TermSelector
+              selectedAcademicYear={selectedAcademicYear}
+              selectedSemester={selectedSemester}
+              onTermChange={handleTermChange}
+            />
+            <StatusBar tasks={tasksForSelectedTerm} />
             <button
               onClick={() => setShowForm(true)}
               className="px-4 py-2 rounded-md text-sm font-medium text-white
-                         bg-slate-900 hover:bg-slate-800 
+                         bg-slate-900 hover:bg-slate-800
                          shadow-sm transition-all duration-200 active:scale-[0.98]
                          flex items-center gap-2"
             >
@@ -106,20 +206,24 @@ function App() {
           </div>
         </div>
 
-        {/* Main content */}
+        {/* Main content: Table + Sidebar */}
         <div className="flex gap-6 items-start">
           <div className="flex-1 min-w-0">
             <TaskTable
-              tasks={tasks}
+              tasks={tasksForSelectedTerm}
               onStatusChange={handleStatusChange}
-              onDelete={handleDelete}
+              onDelete={handleDeleteTask}
               isLoading={isLoading}
             />
           </div>
           <div className="w-[220px] flex-shrink-0 hidden lg:block">
-            <SubjectList tasks={tasks} />
+            <SubjectManager
+              savedSubjectsForTerm={savedSubjectsForSelectedTerm}
+              onAddSubject={handleAddSubject}
+              onDeleteSubject={handleDeleteSubject}
+            />
             <div className="mt-6">
-              <StatusChart tasks={tasks} />
+              <StatusChart tasks={tasksForSelectedTerm} />
             </div>
           </div>
         </div>
@@ -127,7 +231,8 @@ function App() {
 
       {showForm && (
         <TaskForm
-          onAdd={handleAdd}
+          savedSubjectsList={savedSubjectsForSelectedTerm}
+          onAdd={handleAddTask}
           onClose={() => setShowForm(false)}
           isLoading={isSyncing}
         />

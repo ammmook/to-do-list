@@ -3,8 +3,13 @@ const API_URL = import.meta.env.VITE_GOOGLE_SHEET_API_URL;
 /**
  * Google Apps Script CORS workaround:
  * All operations use GET requests with URL parameters.
- * Data model: id, subject, task, category, deadline, priority, status, note, createdAt
+ *
+ * This service handles two data types:
+ *   1. Tasks — the main todo items
+ *   2. Subjects — saved subject names per academic term
  */
+
+// ─── Task API ────────────────────────────────────────────────────
 
 export async function fetchTodos() {
   try {
@@ -27,9 +32,10 @@ export async function addTodo(formData) {
       task: formData.task,
       category: formData.category || '',
       deadline: formData.deadline || '',
-      priority: formData.priority || 'Medium',
       status: formData.status || 'Not Started',
       note: formData.note || '',
+      academicYear: String(formData.academicYear || ''),
+      semester: String(formData.semester || ''),
     });
     const url = `${API_URL}?${params.toString()}`;
     const response = await fetch(url);
@@ -52,7 +58,6 @@ export async function updateTodo(id, updates) {
     if (updates.task !== undefined) params.set('task', updates.task);
     if (updates.category !== undefined) params.set('category', updates.category);
     if (updates.deadline !== undefined) params.set('deadline', updates.deadline);
-    if (updates.priority !== undefined) params.set('priority', updates.priority);
     if (updates.status !== undefined) params.set('status', updates.status);
     if (updates.note !== undefined) params.set('note', updates.note);
 
@@ -80,6 +85,59 @@ export async function deleteTodo(id) {
     return data;
   } catch (error) {
     console.error('Error deleting todo:', error);
+    throw error;
+  }
+}
+
+// ─── Subject API ─────────────────────────────────────────────────
+// Subjects are stored in a separate "Subjects" sheet tab,
+// scoped by academicYear + semester.
+
+export async function fetchSavedSubjects() {
+  try {
+    const url = `${API_URL}?action=getSubjects`;
+    const response = await fetch(url);
+    const data = await response.json();
+    if (data.error) throw new Error(data.error);
+    return data.data || [];
+  } catch (error) {
+    console.error('Error fetching subjects:', error);
+    throw error;
+  }
+}
+
+export async function saveNewSubject(subjectName, academicYear, semester) {
+  try {
+    const params = new URLSearchParams({
+      action: 'addSubject',
+      name: subjectName,
+      academicYear: String(academicYear),
+      semester: String(semester),
+    });
+    const url = `${API_URL}?${params.toString()}`;
+    const response = await fetch(url);
+    const data = await response.json();
+    if (data.error) throw new Error(data.error);
+    return data.data;
+  } catch (error) {
+    console.error('Error saving subject:', error);
+    throw error;
+  }
+}
+
+export async function removeSubject(subjectId) {
+  try {
+    const params = new URLSearchParams({
+      action: 'deleteSubject',
+      id: subjectId,
+    });
+    const url = `${API_URL}?${params.toString()}`;
+    const response = await fetch(url);
+    const data = await response.json();
+    if (data.error) throw new Error(data.error);
+    return data;
+  } catch (error) {
+    console.error('Error removing subject:', error);
     throw error;
   }
 }
