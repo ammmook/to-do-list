@@ -188,7 +188,7 @@ function App() {
 
   // ─── Render Dashboard ──────────────────────────────────────────
   return (
-    <div className="dashboard-container font-sans">
+    <div className="dashboard-container">
       
       {/* ═══════════ MOBILE HEADER (Visible only on small screens) ═══════════ */}
       <header className="md:hidden bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between sticky top-0 z-20 shadow-sm cursor-pointer" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
