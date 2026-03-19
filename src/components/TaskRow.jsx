@@ -1,5 +1,4 @@
 function TaskRow({ task, index, onStatusChange, onDelete }) {
-  // Calculate days left
   const getDaysLeft = (deadline) => {
     if (!deadline) return '-';
     const today = new Date();
@@ -10,76 +9,71 @@ function TaskRow({ task, index, onStatusChange, onDelete }) {
   };
 
   const daysLeft = getDaysLeft(task.deadline);
-  const pastelClass = `row-pastel-${index % 6}`;
 
-  const statusClass = task.status === 'Done' ? 'status-done' :
-                      task.status === 'Pending' ? 'status-pending' : 'status-not-started';
+  // Muted Minimalist Badges
+  const statusConfig = {
+    'Done': 'bg-emerald-50 text-emerald-700 border-emerald-200/60',
+    'Pending': 'bg-amber-50 text-amber-700 border-amber-200/60',
+    'Not Started': 'bg-slate-100 text-slate-600 border-slate-200',
+  };
+  const statusClass = statusConfig[task.status] || statusConfig['Not Started'];
 
-  const priorityClass = task.priority === 'High' ? 'priority-high' :
-                        task.priority === 'Medium' ? 'priority-medium' : 'priority-low';
+  const priorityConfig = {
+    'High': 'text-red-600 bg-red-50',
+    'Medium': 'text-orange-600 bg-orange-50',
+    'Low': 'text-slate-500 bg-slate-100',
+  };
+  const priorityClass = priorityConfig[task.priority] || priorityConfig['Low'];
 
   const formatDate = (dateStr) => {
     if (!dateStr) return '-';
     try {
-      const d = new Date(dateStr);
-      return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-    } catch {
-      return dateStr;
-    }
-  };
-
-  const formatCreatedAt = (dateStr) => {
-    if (!dateStr) return '-';
-    try {
-      const d = new Date(dateStr);
-      return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) + ' ' +
-             d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+      return new Date(dateStr).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
     } catch {
       return dateStr;
     }
   };
 
   return (
-    <tr className={`${pastelClass} border-b border-gray-100 hover:brightness-95 transition-all text-sm slide-in`}>
-      <td className="px-3 py-2.5 text-center text-gray-400 text-xs">{index + 1}</td>
-      <td className="px-3 py-2.5 font-medium text-gray-700">{task.subject}</td>
-      <td className="px-3 py-2.5 text-gray-600">{task.task}</td>
-      <td className="px-3 py-2.5 text-gray-500">{task.category}</td>
-      <td className="px-3 py-2.5 text-gray-500 text-xs">{formatDate(task.deadline)}</td>
-      <td className="px-3 py-2.5 text-center">
+    <tr className="hover:bg-slate-50/80 transition-colors duration-200 group fade-in">
+      <td className="px-4 py-3 text-center text-slate-400 text-xs">{index + 1}</td>
+      <td className="px-4 py-3 font-medium text-slate-900">{task.subject}</td>
+      <td className="px-4 py-3 text-slate-600">{task.task}</td>
+      <td className="px-4 py-3 text-slate-500 text-sm">{task.category}</td>
+      <td className="px-4 py-3 text-slate-500 text-sm">{formatDate(task.deadline)}</td>
+      <td className="px-4 py-3 text-center">
         {daysLeft === '-' ? (
-          <span className="text-gray-300">-</span>
+          <span className="text-slate-300">-</span>
         ) : (
-          <span className={`text-xs font-medium ${daysLeft < 0 ? 'text-red-500' : daysLeft <= 3 ? 'text-orange-500' : 'text-gray-500'}`}>
+          <span className={`text-xs font-medium ${daysLeft < 0 ? 'text-red-500' : daysLeft <= 3 ? 'text-amber-600' : 'text-slate-500'}`}>
             {daysLeft}
           </span>
         )}
       </td>
-      <td className="px-3 py-2.5 text-center">
-        <span className={`${priorityClass} text-xs font-medium px-2.5 py-1 rounded-full`}>
+      <td className="px-4 py-3 text-center">
+        <span className={`text-xs font-medium px-2 py-1 rounded-md ${priorityClass}`}>
           {task.priority}
         </span>
       </td>
-      <td className="px-3 py-2.5 text-center">
+      <td className="px-4 py-3 text-center">
         <select
           value={task.status}
           onChange={(e) => onStatusChange(task.id, e.target.value)}
-          className={`${statusClass} text-xs font-medium px-2 py-1 rounded-full border-0 cursor-pointer focus:outline-none`}
+          className={`text-xs font-medium px-2 py-1 rounded-md border cursor-pointer focus:outline-none focus:ring-2 focus:ring-slate-200 transition-colors ${statusClass}`}
         >
           <option value="Not Started">Not Started</option>
           <option value="Pending">Pending</option>
           <option value="Done">Done</option>
         </select>
       </td>
-      <td className="px-3 py-2.5 text-gray-500 text-xs max-w-[150px] truncate" title={task.note}>
+      <td className="px-4 py-3 text-slate-500 text-xs max-w-[150px] truncate" title={task.note}>
         {task.note || '-'}
       </td>
-      <td className="px-3 py-2.5 text-gray-400 text-xs whitespace-nowrap">{formatCreatedAt(task.createdAt)}</td>
-      <td className="px-3 py-2.5 text-center">
+      <td className="px-4 py-3 text-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
         <button
           onClick={() => onDelete(task.id)}
-          className="text-gray-300 hover:text-red-400 transition-colors p-1"
-          title="Delete"
+          className="text-slate-400 hover:text-red-500 hover:bg-red-50 p-1.5 rounded-md transition-colors"
+          title="Delete task"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
             <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
