@@ -39,6 +39,10 @@ function App() {
 
   // ─── UI State ──────────────────────────────────────────────────
   const [showTaskForm, setShowTaskForm] = useState(false)
+  const [showSubjectModal, setShowSubjectModal] = useState(false)
+  const [showLogoutMenu, setShowLogoutMenu] = useState(false)
+  const [isAddingSubject, setIsAddingSubject] = useState(false)
+  const [newSubjectName, setNewSubjectName] = useState('')
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   // ─── Derived Data ──────────────────────────────────────────────
@@ -163,10 +167,23 @@ function App() {
         userProfile.email
       )
       setAllSavedSubjects(previousSubjects => [...previousSubjects, savedSubject])
+      return true
     } catch (err) {
       setError('Failed to save subject.')
       console.error(err)
+      return false
     }
+  }
+
+  const handleMobileAddSubject = async () => {
+    if (!newSubjectName.trim()) return
+    setIsAddingSubject(true)
+    const success = await handleAddSubject(newSubjectName.trim())
+    if (success) {
+      setNewSubjectName('')
+      setShowSubjectModal(false)
+    }
+    setIsAddingSubject(false)
   }
 
   const handleDeleteSubject = async (subjectId) => {
@@ -188,10 +205,10 @@ function App() {
 
   // ─── Render Dashboard ──────────────────────────────────────────
   return (
-    <div className="dashboard-container">
+    <div className="dashboard-container !flex !flex-col md:!grid md:!grid-cols-[280px_1fr] max-w-full overflow-x-hidden">
       
       {/* ═══════════ MOBILE HEADER (Visible only on small screens) ═══════════ */}
-      <header className="md:hidden bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between sticky top-0 z-20 shadow-sm cursor-pointer" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
+      <header className="md:hidden bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between sticky top-0 z-20 shadow-sm">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center text-white">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -199,39 +216,57 @@ function App() {
               <path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd" />
             </svg>
           </div>
-          <div>
-            <h1 className="text-sm font-bold text-slate-900 leading-tight">Task Manager</h1>
-            <p className="text-[10px] text-slate-500">Academic Dashboard</p>
-          </div>
+          <h1 className="text-sm font-bold text-slate-900">Task Manager</h1>
         </div>
         
-        {/* Mobile Menu Toggle & User Avatar */}
-        <div className="flex items-center gap-3">
-          {userProfile.picture ? (
-            <img src={userProfile.picture} alt="Profile" className="w-8 h-8 rounded-full border border-slate-200 shadow-sm" />
-          ) : (
-            <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 text-xs font-bold">
-              {userProfile.name.charAt(0).toUpperCase()}
-            </div>
-          )}
-          <button 
-            className="p-1.5 text-slate-600 hover:bg-slate-100 rounded-md transition-colors button-pop"
+        <div className="flex items-center gap-2.5 relative">
+          <div className="text-right hidden sm:block">
+            <p className="text-[11px] font-bold text-slate-900 leading-tight">{userProfile.name}</p>
+            <p className="text-[9px] text-slate-500 leading-tight truncate max-w-[120px]">{userProfile.email}</p>
+          </div>
+          <div 
+            className="flex items-center gap-2 cursor-pointer" 
+            onClick={() => setShowLogoutMenu(!showLogoutMenu)}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              {isMobileMenuOpen ? (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              ) : (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              )}
+            {userProfile.picture ? (
+              <img src={userProfile.picture} alt="Profile" className="w-8 h-8 rounded-full border border-slate-200 shadow-sm" />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 text-xs font-bold">
+                {userProfile.name.charAt(0).toUpperCase()}
+              </div>
+            )}
+            <svg xmlns="http://www.w3.org/2000/svg" className={`h-3 w-3 text-slate-400 transition-transform ${showLogoutMenu ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
             </svg>
-          </button>
+          </div>
+
+          {showLogoutMenu && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setShowLogoutMenu(false)} />
+              <div className="absolute right-0 top-10 w-40 bg-white rounded-xl shadow-xl border border-slate-100 z-20 py-1 fade-in">
+                <div className="px-3 py-2 border-b border-slate-50 sm:hidden">
+                  <p className="text-[11px] font-bold text-slate-900 leading-tight truncate">{userProfile.name}</p>
+                  <p className="text-[9px] text-slate-500 leading-tight truncate">{userProfile.email}</p>
+                </div>
+                <button
+                  onClick={handleLogout}
+                  className="w-full text-left px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                  </svg>
+                  Sign Out
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </header>
 
       {/* ═══════════ LEFT SIDEBAR ═══════════
        * Uses the semantic .dashboard-sidebar class.
        */}
-      <aside className={`dashboard-sidebar ${isMobileMenuOpen ? 'flex absolute z-10 w-full shadow-md' : 'hidden md:flex relative'}`}>
+      <aside className="dashboard-sidebar hidden md:flex relative border-r border-slate-200">
 
         {/* Desktop Branding (Hidden on mobile via header) */}
         <div className="hidden md:block mb-1 fade-in">
@@ -249,12 +284,12 @@ function App() {
         </div>
 
         {/* User Profile Card */}
-        <div className="bg-slate-50 rounded-xl p-3 flex items-center justify-between border border-slate-100 fade-in stagger-1 hover-lift">
+        <div className="hidden md:flex bg-slate-50 rounded-xl p-3 items-center justify-between border border-slate-100 fade-in stagger-1 hover-lift">
           <div className="flex items-center gap-3 overflow-hidden">
             {userProfile.picture ? (
-              <img src={userProfile.picture} alt="Profile" className="w-8 h-8 rounded-full border border-slate-200 flex-shrink-0 hidden md:block" />
+              <img src={userProfile.picture} alt="Profile" className="w-8 h-8 rounded-full border border-slate-200 flex-shrink-0" />
             ) : (
-              <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 text-xs font-bold hidden md:flex">
+              <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 text-xs font-bold">
                 {userProfile.name.charAt(0).toUpperCase()}
               </div>
             )}
@@ -274,7 +309,7 @@ function App() {
           </button>
         </div>
 
-        <div className="fade-in stagger-2">
+        <div className="fade-in stagger-2 hidden md:block">
           {/* Term Selector */}
           <TermSelector
             selectedAcademicYear={selectedAcademicYear}
@@ -303,18 +338,29 @@ function App() {
         </div>
       </aside>
 
-      {/* Overlay to catch clicks and close mobile menu */}
-      {isMobileMenuOpen && (
-        <div 
-          className="fixed inset-0 bg-slate-900/20 z-[5] md:hidden backdrop-blur-sm" 
-          onClick={() => setIsMobileMenuOpen(false)}
-        />
-      )}
-
       {/* ═══════════ MAIN CONTENT AREA ═══════════
        * Powered by .dashboard-main CSS
        */}
       <main className="dashboard-main fade-in stagger-1">
+
+        {/* Mobile Controls (Term + Add Subject) */}
+        <div className="md:hidden flex items-center justify-between gap-3 mb-2">
+          <TermSelector
+            selectedAcademicYear={selectedAcademicYear}
+            selectedSemester={selectedSemester}
+            onTermChange={handleTermChange}
+            variant="compact"
+          />
+          <button
+            onClick={() => setShowSubjectModal(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-full text-[11px] font-bold text-slate-700 shadow-sm active:scale-95 transition-transform"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+            </svg>
+            Add Subject
+          </button>
+        </div>
 
         {/* Error Banner */}
         {error && (
@@ -353,13 +399,18 @@ function App() {
           </button>
         </div>
 
-        {/* Status Summary Cards (Stacks on mobile) */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 fade-in stagger-2">
+        {/* Status Summary Cards (Fit width on mobile) */}
+        <div className="grid grid-cols-3 gap-1.5 sm:gap-4 fade-in stagger-2">
           <StatusSummaryCards tasks={tasksForSelectedTerm} />
         </div>
 
+        {/* Overview (Status Chart) — Moved closer to cards on mobile */}
+        <div className="md:hidden fade-in stagger-3">
+          <StatusChart tasks={tasksForSelectedTerm} />
+        </div>
+
         {/* Task Table */}
-        <div className="fade-in stagger-3 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden hover-lift flex-1 min-h-[400px]">
+        <div className="fade-in stagger-3 w-full">
           <TaskTable
             tasks={tasksForSelectedTerm}
             onStatusChange={handleStatusChange}
@@ -368,15 +419,79 @@ function App() {
           />
         </div>
 
-        {/* Mobile-only Status Chart */}
-        <div className="md:hidden">
-          <StatusChart tasks={tasksForSelectedTerm} />
-          <div className="text-[10px] text-slate-300 text-center mt-6">
-            Synced with Google Sheets
-          </div>
+        <div className="text-[10px] text-slate-300 text-center mt-6">
+          Synced with Google Sheets
         </div>
 
       </main>
+
+      {/* ═══════════ SUBJECT MODAL (Mobile only) ═══════════ */}
+      {showSubjectModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm modal-overlay" onClick={() => setShowSubjectModal(false)}>
+          <div className="w-full max-w-sm bg-white rounded-2xl shadow-xl modal-content flex flex-col max-h-[80vh]" onClick={e => e.stopPropagation()}>
+            <div className="p-6 pb-4">
+              <h3 className="text-lg font-bold text-slate-900 mb-2">Manage Subjects</h3>
+              <p className="text-sm text-slate-500 mb-5">Add or remove subjects for this term.</p>
+              <div className="flex gap-2 mb-4">
+                <input
+                  type="text"
+                  value={newSubjectName}
+                  onChange={(e) => setNewSubjectName(e.target.value)}
+                  placeholder="e.g. Mathematics"
+                  autoFocus
+                  className="flex-1 px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900"
+                />
+                <button 
+                  onClick={handleMobileAddSubject} 
+                  disabled={isAddingSubject || !newSubjectName.trim()} 
+                  className="px-4 py-2 text-xs font-bold text-white bg-slate-900 rounded-xl disabled:opacity-50 active:scale-95 transition-transform"
+                >
+                  {isAddingSubject ? '...' : 'Add'}
+                </button>
+              </div>
+            </div>
+
+            {/* Subject List inside Modal */}
+            <div className="flex-1 overflow-y-auto px-6 pb-6 no-scrollbar">
+              <div className="divide-y divide-slate-50 border border-slate-100 rounded-xl overflow-hidden bg-slate-50/30">
+                {savedSubjectsForSelectedTerm.length === 0 ? (
+                  <div className="px-4 py-8 text-center text-slate-400 text-xs italic">
+                    No subjects added yet
+                  </div>
+                ) : (
+                  savedSubjectsForSelectedTerm.map((subject, index) => (
+                    <div
+                      key={subject.id}
+                      className="flex items-center justify-between px-4 py-3 bg-white"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-500 text-[10px] font-bold flex items-center justify-center flex-shrink-0">
+                          {index + 1}
+                        </span>
+                        <span className="text-slate-700 text-xs font-semibold truncate">{subject.name}</span>
+                      </div>
+                      <button
+                        onClick={() => handleDeleteSubject(subject.id)}
+                        className="text-slate-300 hover:text-red-500 p-1.5 rounded-lg transition-colors flex-shrink-0 active:scale-90"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div className="px-6 py-4 border-t border-slate-50 bg-slate-50/30 rounded-b-2xl">
+              <button onClick={() => setShowSubjectModal(false)} className="w-full py-2.5 text-xs font-bold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ═══════════ TASK FORM MODAL ═══════════ */}
       {showTaskForm && (

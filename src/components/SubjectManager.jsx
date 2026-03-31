@@ -15,7 +15,6 @@ function SubjectManager({ savedSubjectsForTerm, onAddSubject, onDeleteSubject })
   const handleAddSubject = async () => {
     const trimmedSubjectName = newSubjectInputText.trim();
 
-    // Prevent empty or duplicate subject names
     const isEmpty = trimmedSubjectName === '';
     const isDuplicate = savedSubjectsForTerm.some(
       (subject) => subject.name.toLowerCase() === trimmedSubjectName.toLowerCase()
@@ -40,13 +39,13 @@ function SubjectManager({ savedSubjectsForTerm, onAddSubject, onDeleteSubject })
   };
 
   return (
-    <div className="interactive-card hover-lift p-0 overflow-hidden">
+    <div className="interactive-card hover-lift p-0 overflow-hidden hidden md:block">
       {/* Header */}
       <div className="px-4 py-3 border-b border-slate-100">
         <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Subjects</h3>
       </div>
 
-      {/* Add Subject Input */}
+      {/* Add Subject Input (Desktop Inline) */}
       <div className="px-3 py-3 border-b border-slate-100 bg-slate-50/50">
         <div className="flex gap-2">
           <input
