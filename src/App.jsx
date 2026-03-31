@@ -6,6 +6,8 @@ import StatusChart from './components/StatusChart'
 import SubjectManager from './components/SubjectManager'
 import TaskTable from './components/TaskTable'
 import TaskForm from './components/TaskForm'
+import LoadingDots from './components/LoadingDots'
+import ConfirmationModal from './components/ConfirmationModal'
 
 import {
   fetchTodosForUser, addTodoWithUserEmail, updateTodoWithUserEmail, deleteTodoWithUserEmail,
@@ -44,6 +46,9 @@ function App() {
   const [isAddingSubject, setIsAddingSubject] = useState(false)
   const [newSubjectName, setNewSubjectName] = useState('')
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [taskToDelete, setTaskToDelete] = useState(null)
+  const [subjectToDelete, setSubjectToDelete] = useState(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   // ─── Derived Data ──────────────────────────────────────────────
   const tasksForSelectedTerm = useMemo(() => {
@@ -144,15 +149,24 @@ function App() {
     }
   }
 
-  const handleDeleteTask = async (taskId) => {
+  const handleDeleteTask = (taskId) => {
+    setTaskToDelete(taskId)
+  }
+
+  const confirmDeleteTask = async () => {
+    if (!taskToDelete) return
+    setIsDeleting(true)
     const previousTasks = [...allTasks]
-    setAllTasks(prev => prev.filter(task => task.id !== taskId))
+    setAllTasks(prev => prev.filter(task => task.id !== taskToDelete))
     try {
-      await deleteTodoWithUserEmail(taskId, userProfile.email)
+      await deleteTodoWithUserEmail(taskToDelete, userProfile.email)
     } catch (err) {
       setAllTasks(previousTasks)
       setError('Failed to delete task.')
       console.error(err)
+    } finally {
+      setIsDeleting(false)
+      setTaskToDelete(null)
     }
   }
 
@@ -181,20 +195,29 @@ function App() {
     const success = await handleAddSubject(newSubjectName.trim())
     if (success) {
       setNewSubjectName('')
-      setShowSubjectModal(false)
+      // Success! Subject is added to the list. Modal stays open as requested.
     }
     setIsAddingSubject(false)
   }
 
-  const handleDeleteSubject = async (subjectId) => {
+  const handleDeleteSubject = (subjectId) => {
+    setSubjectToDelete(subjectId)
+  }
+
+  const confirmDeleteSubject = async () => {
+    if (!subjectToDelete) return
+    setIsDeleting(true)
     const previousSubjects = [...allSavedSubjects]
-    setAllSavedSubjects(prev => prev.filter(s => s.id !== subjectId))
+    setAllSavedSubjects(prev => prev.filter(s => s.id !== subjectToDelete))
     try {
-      await removeSubjectWithUserEmail(subjectId, userProfile.email)
+      await removeSubjectWithUserEmail(subjectToDelete, userProfile.email)
     } catch (err) {
       setAllSavedSubjects(previousSubjects)
       setError('Failed to remove subject.')
       console.error(err)
+    } finally {
+      setIsDeleting(false)
+      setSubjectToDelete(null)
     }
   }
 
@@ -430,7 +453,14 @@ function App() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm modal-overlay" onClick={() => setShowSubjectModal(false)}>
           <div className="w-full max-w-sm bg-white rounded-2xl shadow-xl modal-content flex flex-col max-h-[80vh]" onClick={e => e.stopPropagation()}>
             <div className="p-6 pb-4">
-              <h3 className="text-lg font-bold text-slate-900 mb-2">Manage Subjects</h3>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-lg font-bold text-slate-900">Manage Subjects</h3>
+                <button onClick={() => setShowSubjectModal(false)} className="text-slate-400 hover:text-slate-600 transition-colors p-1 rounded-md hover:bg-slate-100 cursor-pointer button-pop">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              </div>
               <p className="text-sm text-slate-500 mb-5">Add or remove subjects for this term.</p>
               <div className="flex gap-2 mb-4">
                 <input
@@ -444,9 +474,9 @@ function App() {
                 <button 
                   onClick={handleMobileAddSubject} 
                   disabled={isAddingSubject || !newSubjectName.trim()} 
-                  className="px-4 py-2 text-xs font-bold text-white bg-slate-900 rounded-xl disabled:opacity-50 active:scale-95 transition-transform"
+                  className="px-4 py-2 text-xs font-bold text-white bg-slate-900 rounded-xl disabled:opacity-50 active:scale-95 transition-transform flex items-center justify-center min-w-[60px]"
                 >
-                  {isAddingSubject ? '...' : 'Add'}
+                  {isAddingSubject ? <LoadingDots /> : 'Add'}
                 </button>
               </div>
             </div>
@@ -502,8 +532,30 @@ function App() {
           isLoading={isSyncing}
         />
       )}
+
+      {/* ═══════════ DELETE TASK CONFIRMATION ═══════════ */}
+      {taskToDelete && (
+        <ConfirmationModal
+          title="Delete Task"
+          message="Are you sure you want to delete this task? This action cannot be undone."
+          onConfirm={confirmDeleteTask}
+          onCancel={() => setTaskToDelete(null)}
+          isLoading={isDeleting}
+        />
+      )}
+
+      {/* ═══════════ DELETE SUBJECT CONFIRMATION ═══════════ */}
+      {subjectToDelete && (
+        <ConfirmationModal
+          title="Remove Subject"
+          message="Are you sure you want to remove this subject? It will no longer be selectable for new tasks."
+          onConfirm={confirmDeleteSubject}
+          onCancel={() => setSubjectToDelete(null)}
+          isLoading={isDeleting}
+        />
+      )}
     </div>
-  )
+  );
 }
 
 export default App

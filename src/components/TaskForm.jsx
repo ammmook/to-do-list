@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import LoadingDots from './LoadingDots';
 
 /**
  * TaskForm — Modal form for creating a new task.
@@ -26,7 +27,7 @@ function TaskForm({ savedSubjectsList, onAdd, onClose, isLoading }) {
   const [newTaskStatus, setNewTaskStatus] = useState('Not Started');
   const [newTaskNote, setNewTaskNote] = useState('');
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
 
     const isSubjectValid = selectedSubjectForTask.trim() !== '';
@@ -41,7 +42,7 @@ function TaskForm({ savedSubjectsList, onAdd, onClose, isLoading }) {
         status: newTaskStatus,
         note: newTaskNote.trim(),
       };
-      onAdd(formData);
+      await onAdd(formData);
       onClose();
     }
   };
@@ -183,9 +184,9 @@ function TaskForm({ savedSubjectsList, onAdd, onClose, isLoading }) {
             <button
               type="submit"
               disabled={isSubmitDisabled}
-              className="interactive-button"
+              className="interactive-button min-w-[100px]"
             >
-              {isLoading ? 'Saving...' : 'Save Task'}
+              {isLoading ? <LoadingDots /> : 'Save Task'}
             </button>
           </div>
         </form>

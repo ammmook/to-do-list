@@ -120,8 +120,8 @@ function TaskRow({ task, index, onStatusChange, onDelete }) {
         {task.note || '-'}
       </td>
 
-      {/* Delete (visible on hover) */}
-      <td className="px-4 py-3 text-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+      {/* Delete (always visible) */}
+      <td className="px-4 py-3 text-center">
         <button
           onClick={() => onDelete(task.id)}
           className="text-slate-400 hover:text-red-500 hover:bg-red-50 p-1.5 rounded-md transition-colors cursor-pointer button-pop"
