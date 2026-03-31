@@ -20,13 +20,12 @@ function TaskRow({ task, index, onStatusChange, onDelete }) {
     return differenceInDays;
   };
 
-  const daysLeft = getDaysLeft(task.deadline);
+  const isTaskDone = task.status === 'Done';
+  const daysLeft = isTaskDone ? 0 : getDaysLeft(task.deadline);
 
   // ─── Auto-Calculated Priority ────────────────────────────────────
   // Computed every render so it updates automatically as dates change
   const computedPriority = calculateTaskPriority(task.deadline, task.status);
-
-  const isTaskDone = task.status === 'Done';
 
   // ─── Style Configurations ────────────────────────────────────────
 
@@ -72,18 +71,18 @@ function TaskRow({ task, index, onStatusChange, onDelete }) {
 
   return (
     <tr className="hover:bg-slate-50/80 transition-colors duration-200 group fade-in">
-      <td className="px-4 py-3 text-center text-slate-400 text-xs">{index + 1}</td>
-      <td className={`px-4 py-3 font-medium text-slate-900 ${doneStrikethroughClass}`}>{task.subject}</td>
-      <td className={`px-4 py-3 text-slate-600 ${doneStrikethroughClass}`}>{task.task}</td>
-      <td className="px-4 py-3 text-slate-500 text-sm">{task.category}</td>
-      <td className="px-4 py-3 text-slate-500 text-sm">{formatDate(task.deadline)}</td>
+      <td className={`px-4 py-3 text-center text-xs ${isTaskDone ? 'line-through text-slate-400' : 'text-slate-400'}`}>{index + 1}</td>
+      <td className={`px-4 py-3 font-medium ${isTaskDone ? 'line-through text-slate-400' : 'text-slate-900'}`}>{task.subject}</td>
+      <td className={`px-4 py-3 ${isTaskDone ? 'line-through text-slate-400' : 'text-slate-600'}`}>{task.task}</td>
+      <td className={`px-4 py-3 text-sm ${isTaskDone ? 'line-through text-slate-400' : 'text-slate-500'}`}>{task.category}</td>
+      <td className={`px-4 py-3 text-sm ${isTaskDone ? 'line-through text-slate-400' : 'text-slate-500'}`}>{formatDate(task.deadline)}</td>
 
       {/* Days Left */}
       <td className="px-4 py-3 text-center">
         {daysLeft === '-' ? (
-          <span className="text-slate-300">-</span>
+          <span className={`text-slate-300 ${doneStrikethroughClass}`}>-</span>
         ) : (
-          <span className={`text-xs font-medium ${getDaysLeftColorClass(daysLeft)}`}>
+          <span className={`text-xs font-medium ${isTaskDone ? 'line-through text-slate-400' : getDaysLeftColorClass(daysLeft)}`}>
             {daysLeft}
           </span>
         )}
@@ -92,11 +91,11 @@ function TaskRow({ task, index, onStatusChange, onDelete }) {
       {/* Auto-Calculated Priority */}
       <td className="px-4 py-3 text-center">
         {computedPriority ? (
-          <span className={`text-xs font-medium px-2 py-1 rounded-md ${priorityClassName}`}>
+          <span className={`text-xs font-medium px-2 py-1 rounded-md ${isTaskDone ? 'line-through text-slate-400 bg-slate-50' : priorityClassName}`}>
             {computedPriority}
           </span>
         ) : (
-          <span className="text-slate-300">-</span>
+          <span className={`text-slate-300 ${doneStrikethroughClass}`}>-</span>
         )}
       </td>
 
@@ -116,7 +115,7 @@ function TaskRow({ task, index, onStatusChange, onDelete }) {
       </td>
 
       {/* Note */}
-      <td className="px-4 py-3 text-slate-500 text-xs max-w-[150px] truncate" title={task.note}>
+      <td className={`px-4 py-3 text-xs max-w-[150px] truncate ${isTaskDone ? 'line-through text-slate-400' : 'text-slate-500'}`} title={task.note}>
         {task.note || '-'}
       </td>
 
