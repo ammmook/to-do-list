@@ -39,13 +39,13 @@ function StatusChart({ tasks }) {
   ];
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200/80 p-4 shadow-sm">
-      <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-4">Overview</h3>
+    <div className="bg-white rounded-xl border border-slate-200/80 p-3 sm:p-4 shadow-sm">
+      <h3 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 sm:mb-4">Overview</h3>
 
-      <div className="flex flex-col items-center gap-4">
+      <div className="flex flex-row sm:flex-col items-center justify-around sm:justify-center gap-2 sm:gap-4">
         {/* Donut Chart */}
-        <div className="relative">
-          <svg width="110" height="110" viewBox="0 0 100 100">
+        <div className="relative shrink-0">
+          <svg viewBox="0 0 100 100" className="w-[84px] h-[84px] sm:w-[110px] sm:h-[110px]">
             {/* Background ring */}
             <circle cx="50" cy="50" r={radius} fill="none" stroke="#f1f5f9" strokeWidth="12" />
 
@@ -103,7 +103,7 @@ function StatusChart({ tasks }) {
         </div>
 
         {/* Legend */}
-        <div className="flex flex-col gap-1.5 w-full">
+        <div className="flex flex-col gap-1.5 w-full max-w-[120px] sm:max-w-none">
           {legendItems.map((item) => (
             <div key={item.label} className="flex items-center justify-between text-[11px]">
               <div className="flex items-center gap-2">

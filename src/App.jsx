@@ -11,7 +11,8 @@ import ConfirmationModal from './components/ConfirmationModal'
 
 import {
   fetchTodosForUser, addTodoWithUserEmail, updateTodoWithUserEmail, deleteTodoWithUserEmail,
-  fetchSavedSubjectsForUser, saveNewSubjectWithUserEmail, removeSubjectWithUserEmail
+  fetchSavedSubjectsForUser, saveNewSubjectWithUserEmail, removeSubjectWithUserEmail,
+  checkUserAndRole, fetchAllUsers
 } from './services/googleSheetsApi'
 
 import {
@@ -38,6 +39,12 @@ function App() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSyncing, setIsSyncing] = useState(false)
   const [error, setError] = useState(null)
+
+  // ─── Admin & View State ────────────────────────────────────────
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [adminUsersList, setAdminUsersList] = useState([])
+  const [viewingEmail, setViewingEmail] = useState(userProfile.email || '')
+  const isReadOnly = viewingEmail !== userProfile.email
 
   // ─── UI State ──────────────────────────────────────────────────
   const [showTaskForm, setShowTaskForm] = useState(false)
@@ -67,17 +74,34 @@ function App() {
     })
   }, [allSavedSubjects, selectedAcademicYear, selectedSemester])
 
-  // ─── Data Loading ──────────────────────────────────────────────
-  const loadAllData = useCallback(async () => {
+  // ─── Role & Data Loading ───────────────────────────────────────
+  const loadUserRole = useCallback(async () => {
     if (!isLoggedIn || !userProfile.email) return;
+    try {
+      const userData = await checkUserAndRole(userProfile.email)
+      setIsAdmin(userData.isAdmin)
+      if (userData.isAdmin) {
+        const users = await fetchAllUsers(userProfile.email)
+        setAdminUsersList(users)
+      }
+    } catch (err) {
+      console.error("Failed to load user roles", err)
+    }
+  }, [isLoggedIn, userProfile.email])
+
+  useEffect(() => {
+    loadUserRole()
+  }, [loadUserRole])
+
+  const loadAllData = useCallback(async () => {
+    if (!isLoggedIn || !viewingEmail) return;
 
     setIsLoading(true);
     try {
       setError(null)
-      // Secure Data Handling: Only fetch data bound to the logged-in email
       const [tasksData, subjectsData] = await Promise.all([
-        fetchTodosForUser(userProfile.email),
-        fetchSavedSubjectsForUser(userProfile.email)
+        fetchTodosForUser(viewingEmail),
+        fetchSavedSubjectsForUser(viewingEmail)
       ])
       setAllTasks(tasksData)
       setAllSavedSubjects(subjectsData)
@@ -87,7 +111,7 @@ function App() {
     } finally {
       setIsLoading(false)
     }
-  }, [isLoggedIn, userProfile.email])
+  }, [isLoggedIn, viewingEmail])
 
   useEffect(() => {
     loadAllData()
@@ -98,6 +122,7 @@ function App() {
     saveAccessToken(credential);
     const profile = saveUserProfile(credential);
     setUserProfile(profile);
+    setViewingEmail(profile.email);
     setIsLoggedIn(true);
   };
 
@@ -107,6 +132,9 @@ function App() {
     setAllTasks([]);
     setAllSavedSubjects([]);
     setUserProfile({ name: 'User', email: '', picture: '' });
+    setIsAdmin(false);
+    setAdminUsersList([]);
+    setViewingEmail('');
   };
 
   // ─── Term Handler ──────────────────────────────────────────────
@@ -117,6 +145,7 @@ function App() {
 
   // ─── Task Handlers ─────────────────────────────────────────────
   const handleAddTask = async (formData) => {
+    if (isReadOnly) return;
     setIsSyncing(true)
     try {
       const taskDataWithTerm = {
@@ -124,7 +153,6 @@ function App() {
         academicYear: selectedAcademicYear,
         semester: selectedSemester,
       }
-      // Secure Data Handling: Append user email on save
       const newTask = await addTodoWithUserEmail(taskDataWithTerm, userProfile.email)
       setAllTasks(previousTasks => [newTask, ...previousTasks])
     } catch (err) {
@@ -136,6 +164,7 @@ function App() {
   }
 
   const handleStatusChange = async (taskId, newStatus) => {
+    if (isReadOnly) return;
     const previousTasks = [...allTasks]
     setAllTasks(prev => prev.map(task =>
       task.id === taskId ? { ...task, status: newStatus } : task
@@ -149,12 +178,28 @@ function App() {
     }
   }
 
+  const handleEditTask = async (taskId, updatedData) => {
+    if (isReadOnly) return;
+    const previousTasks = [...allTasks]
+    setAllTasks(prev => prev.map(task =>
+      task.id === taskId ? { ...task, ...updatedData } : task
+    ))
+    try {
+      await updateTodoWithUserEmail(taskId, updatedData, userProfile.email)
+    } catch (err) {
+      setAllTasks(previousTasks)
+      setError('Failed to update task details.')
+      console.error(err)
+    }
+  }
+
   const handleDeleteTask = (taskId) => {
+    if (isReadOnly) return;
     setTaskToDelete(taskId)
   }
 
   const confirmDeleteTask = async () => {
-    if (!taskToDelete) return
+    if (!taskToDelete || isReadOnly) return
     setIsDeleting(true)
     const previousTasks = [...allTasks]
     setAllTasks(prev => prev.filter(task => task.id !== taskToDelete))
@@ -172,8 +217,8 @@ function App() {
 
   // ─── Subject Handlers ──────────────────────────────────────────
   const handleAddSubject = async (subjectName) => {
+    if (isReadOnly) return false;
     try {
-      // Secure Data Handling: Append user email on save
       const savedSubject = await saveNewSubjectWithUserEmail(
         subjectName,
         selectedAcademicYear,
@@ -190,29 +235,45 @@ function App() {
   }
 
   const handleMobileAddSubject = async () => {
-    if (!newSubjectName.trim()) return
+    if (!newSubjectName.trim() || isReadOnly) return
     setIsAddingSubject(true)
     const success = await handleAddSubject(newSubjectName.trim())
     if (success) {
       setNewSubjectName('')
-      // Success! Subject is added to the list. Modal stays open as requested.
     }
     setIsAddingSubject(false)
   }
 
   const handleDeleteSubject = (subjectId) => {
+    if (isReadOnly) return;
     setSubjectToDelete(subjectId)
   }
 
   const confirmDeleteSubject = async () => {
-    if (!subjectToDelete) return
+    if (!subjectToDelete || isReadOnly) return
     setIsDeleting(true)
+
+    const subjectObj = allSavedSubjects.find(s => s.id === subjectToDelete)
+    
     const previousSubjects = [...allSavedSubjects]
+    const previousTasks = [...allTasks]
+
     setAllSavedSubjects(prev => prev.filter(s => s.id !== subjectToDelete))
+    
+    // Cascade delete on the frontend state for immediate UX response
+    if (subjectObj) {
+      setAllTasks(prev => prev.filter(t => 
+        !(t.subject === subjectObj.name && 
+          String(t.academicYear) === String(subjectObj.academicYear) && 
+          String(t.semester) === String(subjectObj.semester))
+      ))
+    }
+
     try {
       await removeSubjectWithUserEmail(subjectToDelete, userProfile.email)
     } catch (err) {
       setAllSavedSubjects(previousSubjects)
+      setAllTasks(previousTasks)
       setError('Failed to remove subject.')
       console.error(err)
     } finally {
@@ -286,12 +347,8 @@ function App() {
         </div>
       </header>
 
-      {/* ═══════════ LEFT SIDEBAR ═══════════
-       * Uses the semantic .dashboard-sidebar class.
-       */}
+      {/* ═══════════ LEFT SIDEBAR ═══════════ */}
       <aside className="dashboard-sidebar hidden md:flex relative border-r border-slate-200">
-
-        {/* Desktop Branding (Hidden on mobile via header) */}
         <div className="hidden md:block mb-1 fade-in">
           <div className="flex items-center gap-2.5 mb-2">
             <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center text-white shadow-sm">
@@ -306,7 +363,6 @@ function App() {
           </div>
         </div>
 
-        {/* User Profile Card */}
         <div className="hidden md:flex bg-slate-50 rounded-xl p-3 items-center justify-between border border-slate-100 fade-in stagger-1 hover-lift">
           <div className="flex items-center gap-3 overflow-hidden">
             {userProfile.picture ? (
@@ -333,7 +389,6 @@ function App() {
         </div>
 
         <div className="fade-in stagger-2 hidden md:block">
-          {/* Term Selector */}
           <TermSelector
             selectedAcademicYear={selectedAcademicYear}
             selectedSemester={selectedSemester}
@@ -342,15 +397,14 @@ function App() {
         </div>
 
         <div className="fade-in stagger-3">
-          {/* Subject Manager */}
           <SubjectManager
             savedSubjectsForTerm={savedSubjectsForSelectedTerm}
             onAddSubject={handleAddSubject}
             onDeleteSubject={handleDeleteSubject}
+            isReadOnly={isReadOnly}
           />
         </div>
 
-        {/* Status Chart (Hidden on mobile sidebar to save vertical space, shown in main content instead) */}
         <div className="hidden md:block">
           <StatusChart tasks={tasksForSelectedTerm} />
         </div>
@@ -361,12 +415,10 @@ function App() {
         </div>
       </aside>
 
-      {/* ═══════════ MAIN CONTENT AREA ═══════════
-       * Powered by .dashboard-main CSS
-       */}
+      {/* ═══════════ MAIN CONTENT AREA ═══════════ */}
       <main className="dashboard-main fade-in stagger-1">
 
-        {/* Mobile Controls (Term + Add Subject) */}
+        {/* Mobile Controls */}
         <div className="md:hidden flex items-center justify-between gap-3 mb-2">
           <TermSelector
             selectedAcademicYear={selectedAcademicYear}
@@ -374,18 +426,19 @@ function App() {
             onTermChange={handleTermChange}
             variant="compact"
           />
-          <button
-            onClick={() => setShowSubjectModal(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-full text-[11px] font-bold text-slate-700 shadow-sm active:scale-95 transition-transform"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
-            </svg>
-            Add Subject
-          </button>
+          {!isReadOnly && (
+            <button
+              onClick={() => setShowSubjectModal(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-full text-[11px] font-bold text-slate-700 shadow-sm active:scale-95 transition-transform"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+              </svg>
+              Add Subject
+            </button>
+          )}
         </div>
 
-        {/* Error Banner */}
         {error && (
           <div className="px-4 py-3 rounded-xl bg-red-50 border border-red-100 flex items-center justify-between fade-in hover-lift">
             <p className="text-red-600 text-sm">{error}</p>
@@ -400,45 +453,74 @@ function App() {
           </div>
         )}
 
-        {/* Main Header — Title + Action button */}
+        {/* Admin Navigation Selector */}
+        {isAdmin && (
+           <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 mb-4 mt-2 sm:mt-0 flex flex-col sm:flex-row items-center justify-between gap-3 fade-in shadow-sm">
+             <div className="flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-slate-500" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-6-3a2 2 0 11-4 0 2 2 0 014 0zm-2 4a5 5 0 00-4.546 2.916A5.986 5.986 0 0010 16a5.986 5.986 0 004.546-2.084A5 5 0 0010 11z" clipRule="evenodd" />
+                </svg>
+                <span className="text-sm font-semibold text-slate-700">Admin Controls</span>
+             </div>
+             <div className="flex items-center gap-2 w-full sm:w-auto">
+                <span className="text-xs text-slate-500 whitespace-nowrap">View Board:</span>
+                <select 
+                  className="flex-1 sm:w-[250px] text-xs border border-slate-300 rounded-md px-2 py-1.5 focus:ring-slate-500 focus:border-slate-500 bg-white shadow-sm font-medium"
+                  value={viewingEmail}
+                  onChange={(e) => setViewingEmail(e.target.value)}
+                >
+                   {adminUsersList.map(u => (
+                     <option key={u.id} value={u.email}>{u.email} {u.email.toLowerCase() === userProfile.email.toLowerCase() ? '(Me)' : ''}</option>
+                   ))}
+                </select>
+             </div>
+           </div>
+        )}
+
+        {/* Main Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 fade-in">
           <div>
-            <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+            <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2 flex-wrap">
               Year {selectedAcademicYear} · Semester {selectedSemester}
+              {isReadOnly && (
+                <span className="bg-amber-100/80 text-amber-800 text-[10px] px-2.5 py-1 rounded-md font-bold uppercase tracking-wider shadow-sm border border-amber-200 break-keep">Read-Only Mode</span>
+              )}
             </h2>
             <p className="text-sm text-slate-500 mt-0.5">
               {tasksForSelectedTerm.length} task{tasksForSelectedTerm.length !== 1 ? 's' : ''} in this term
             </p>
           </div>
 
-          <button
-            onClick={() => setShowTaskForm(true)}
-            className="w-full sm:w-auto interactive-button fade-in hover-lift"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
-            </svg>
-            New Task
-          </button>
+          {!isReadOnly && (
+            <button
+              onClick={() => setShowTaskForm(true)}
+              className="w-full sm:w-auto interactive-button fade-in hover-lift"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+              </svg>
+              New Task
+            </button>
+          )}
         </div>
 
-        {/* Status Summary Cards (Fit width on mobile) */}
-        <div className="grid grid-cols-3 gap-1.5 sm:gap-4 fade-in stagger-2">
+        <div className="grid grid-cols-3 gap-1.5 sm:gap-4 fade-in stagger-2 mt-4">
           <StatusSummaryCards tasks={tasksForSelectedTerm} />
         </div>
 
-        {/* Overview (Status Chart) — Moved closer to cards on mobile */}
         <div className="md:hidden fade-in stagger-3">
           <StatusChart tasks={tasksForSelectedTerm} />
         </div>
 
-        {/* Task Table */}
         <div className="fade-in stagger-3 w-full">
           <TaskTable
             tasks={tasksForSelectedTerm}
+            savedSubjectsList={savedSubjectsForSelectedTerm}
             onStatusChange={handleStatusChange}
+            onEditTask={handleEditTask}
             onDelete={handleDeleteTask}
             isLoading={isLoading}
+            isReadOnly={isReadOnly}
           />
         </div>
 
@@ -449,7 +531,7 @@ function App() {
       </main>
 
       {/* ═══════════ SUBJECT MODAL (Mobile only) ═══════════ */}
-      {showSubjectModal && (
+      {showSubjectModal && !isReadOnly && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm modal-overlay" onClick={() => setShowSubjectModal(false)}>
           <div className="w-full max-w-sm bg-white rounded-2xl shadow-xl modal-content flex flex-col max-h-[80vh]" onClick={e => e.stopPropagation()}>
             <div className="p-6 pb-4">
@@ -481,7 +563,6 @@ function App() {
               </div>
             </div>
 
-            {/* Subject List inside Modal */}
             <div className="flex-1 overflow-y-auto px-6 pb-6 no-scrollbar">
               <div className="divide-y divide-slate-50 border border-slate-100 rounded-xl overflow-hidden bg-slate-50/30">
                 {savedSubjectsForSelectedTerm.length === 0 ? (
@@ -523,8 +604,7 @@ function App() {
         </div>
       )}
 
-      {/* ═══════════ TASK FORM MODAL ═══════════ */}
-      {showTaskForm && (
+      {showTaskForm && !isReadOnly && (
         <TaskForm
           savedSubjectsList={savedSubjectsForSelectedTerm}
           onAdd={handleAddTask}
@@ -533,8 +613,7 @@ function App() {
         />
       )}
 
-      {/* ═══════════ DELETE TASK CONFIRMATION ═══════════ */}
-      {taskToDelete && (
+      {taskToDelete && !isReadOnly && (
         <ConfirmationModal
           title="Delete Task"
           message="Are you sure you want to delete this task? This action cannot be undone."
@@ -544,8 +623,7 @@ function App() {
         />
       )}
 
-      {/* ═══════════ DELETE SUBJECT CONFIRMATION ═══════════ */}
-      {subjectToDelete && (
+      {subjectToDelete && !isReadOnly && (
         <ConfirmationModal
           title="Remove Subject"
           message="Are you sure you want to remove this subject? It will no longer be selectable for new tasks."

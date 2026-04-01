@@ -44,9 +44,8 @@ function StatusSummaryCards({ tasks }) {
             <span className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${card.dotColor}`} />
             <span className="text-[10px] sm:text-xs font-medium text-slate-500 uppercase tracking-wide truncate">{card.label}</span>
           </div>
-          <div className="flex items-end justify-between">
+          <div className="flex items-end">
             <span className={`text-xl sm:text-2xl font-bold ${card.textColor}`}>{card.count}</span>
-            <span className="text-[10px] sm:text-xs text-slate-400">/ {totalTaskCount}</span>
           </div>
         </div>
       ))}

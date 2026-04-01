@@ -1,6 +1,6 @@
 import TaskRow from './TaskRow';
 
-function TaskTable({ tasks, onStatusChange, onDelete, isLoading }) {
+function TaskTable({ tasks, savedSubjectsList, onStatusChange, onEditTask, onDelete, isLoading, isReadOnly }) {
   if (isLoading) {
     return (
       <div className="bg-white rounded-xl border border-slate-200 p-16 flex flex-col items-center gap-4 shadow-sm">
@@ -41,8 +41,11 @@ function TaskTable({ tasks, onStatusChange, onDelete, isLoading }) {
                 key={task.id}
                 task={task}
                 index={index}
+                savedSubjectsList={savedSubjectsList}
                 onStatusChange={onStatusChange}
+                onEditTask={onEditTask}
                 onDelete={onDelete}
+                isReadOnly={isReadOnly}
               />
             ))
           )}

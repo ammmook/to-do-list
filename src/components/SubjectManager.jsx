@@ -8,7 +8,7 @@ import { useState } from 'react';
  * in the sidebar keeps it accessible but out of the main workflow area,
  * reducing visual clutter on the central task table.
  */
-function SubjectManager({ savedSubjectsForTerm, onAddSubject, onDeleteSubject }) {
+function SubjectManager({ savedSubjectsForTerm, onAddSubject, onDeleteSubject, isReadOnly }) {
   const [newSubjectInputText, setNewSubjectInputText] = useState('');
   const [isAdding, setIsAdding] = useState(false);
 
@@ -46,26 +46,28 @@ function SubjectManager({ savedSubjectsForTerm, onAddSubject, onDeleteSubject })
       </div>
 
       {/* Add Subject Input (Desktop Inline) */}
-      <div className="px-3 py-3 border-b border-slate-100 bg-slate-50/50">
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={newSubjectInputText}
-            onChange={(e) => setNewSubjectInputText(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Add subject..."
-            disabled={isAdding}
-            className="interactive-input"
-          />
-          <button
-            onClick={handleAddSubject}
-            disabled={!newSubjectInputText.trim() || isAdding}
-            className="interactive-button button-pop !px-3 !py-1.5 !text-xs"
-          >
-            {isAdding ? '...' : 'Add'}
-          </button>
+      {!isReadOnly && (
+        <div className="px-3 py-3 border-b border-slate-100 bg-slate-50/50">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={newSubjectInputText}
+              onChange={(e) => setNewSubjectInputText(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Add subject..."
+              disabled={isAdding}
+              className="interactive-input"
+            />
+            <button
+              onClick={handleAddSubject}
+              disabled={!newSubjectInputText.trim() || isAdding}
+              className="interactive-button button-pop !px-3 !py-1.5 !text-xs"
+            >
+              {isAdding ? '...' : 'Add'}
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Saved Subjects List */}
       <div className="divide-y divide-slate-50 max-h-[200px] overflow-y-auto">
@@ -86,15 +88,17 @@ function SubjectManager({ savedSubjectsForTerm, onAddSubject, onDeleteSubject })
                 </span>
                 <span className="text-slate-700 text-xs font-medium truncate">{subject.name}</span>
               </div>
-              <button
-                onClick={() => onDeleteSubject(subject.id)}
-                className="text-slate-300 hover:text-red-500 p-1 rounded-md opacity-0 group-hover:opacity-100 transition-all flex-shrink-0 hover:bg-red-50 cursor-pointer button-pop"
-                title="Remove subject"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                </svg>
-              </button>
+              {!isReadOnly && (
+                <button
+                  onClick={() => onDeleteSubject(subject.id)}
+                  className="text-slate-300 hover:text-red-500 p-1 rounded-md opacity-0 group-hover:opacity-100 transition-all flex-shrink-0 hover:bg-red-50 cursor-pointer button-pop"
+                  title="Remove subject"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              )}
             </div>
           ))
         )}

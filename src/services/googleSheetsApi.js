@@ -8,6 +8,42 @@ const API_URL = import.meta.env.VITE_GOOGLE_SHEET_API_URL;
  * This instructs the backend to filter data and bind new records to this exact email.
  */
 
+// ─── User API ────────────────────────────────────────────────────
+
+export async function checkUserAndRole(userEmail) {
+  try {
+    const params = new URLSearchParams({
+      action: 'checkUser',
+      email: userEmail
+    });
+    const url = `${API_URL}?${params.toString()}`;
+    const response = await fetch(url);
+    const data = await response.json();
+    if (data.error) throw new Error(data.error);
+    return data.data; // { email, isAdmin }
+  } catch (error) {
+    console.error('Error checking user role:', error);
+    throw error;
+  }
+}
+
+export async function fetchAllUsers(adminEmail) {
+  try {
+    const params = new URLSearchParams({
+      action: 'getAllUsers',
+      adminEmail: adminEmail
+    });
+    const url = `${API_URL}?${params.toString()}`;
+    const response = await fetch(url);
+    const data = await response.json();
+    if (data.error) throw new Error(data.error);
+    return data.data || [];
+  } catch (error) {
+    console.error('Error fetching all users:', error);
+    throw error;
+  }
+}
+
 // ─── Task API ────────────────────────────────────────────────────
 
 export async function fetchTodosForUser(userEmail) {

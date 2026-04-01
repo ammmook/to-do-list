@@ -5,14 +5,24 @@
 // - Execute as: Me
 // - Who has access: Anyone
 //
-// This script manages TWO sheet tabs:
-//   1. "Sheet1" — Tasks data
-//   2. "Subjects" — Saved subject names per academic term
+// This script manages THREE sheet tabs:
+//   1. "Users" — Stores user registration and isAdmin status
+//   2. "Sheet1" — Tasks data
+//   3. "Subjects" — Saved subject names per academic term
 //
-// BOTH sheets now use multi-user data isolation via the 'ownerEmail' column.
 
 var TASKS_SHEET_NAME = 'Sheet1';
 var SUBJECTS_SHEET_NAME = 'Subjects';
+var USERS_SHEET_NAME = 'Users';
+
+// ─── Column indices (0-based) for Users sheet ────────────────────────
+var USER_COL = {
+  ID: 0,
+  EMAIL: 1,
+  IS_ADMIN: 2,
+  CREATED_AT: 3,
+  LAST_LOGIN_AT: 4
+};
 
 // ─── Column indices (0-based) for Tasks sheet ────────────────────
 var TASK_COL = {
@@ -27,7 +37,7 @@ var TASK_COL = {
   CREATED_AT: 8,
   ACADEMIC_YEAR: 9,
   SEMESTER: 10,
-  OWNER_EMAIL: 11 // New field for multi-user isolation
+  OWNER_EMAIL: 11
 };
 
 // ─── Column indices (0-based) for Subjects sheet ─────────────────
@@ -36,7 +46,7 @@ var SUBJECT_COL = {
   NAME: 1,
   ACADEMIC_YEAR: 2,
   SEMESTER: 3,
-  OWNER_EMAIL: 4 // New field for multi-user isolation
+  OWNER_EMAIL: 4
 };
 
 // ─── Router ──────────────────────────────────────────────────────
@@ -45,6 +55,12 @@ function doGet(e) {
   var action = e.parameter.action;
 
   switch (action) {
+    // User actions
+    case 'checkUser':
+      return checkOrRegisterUser(e.parameter.email);
+    case 'getAllUsers':
+      return getAllUsers(e.parameter.adminEmail);
+
     // Task actions
     case 'getAll':
       return getAllTasks(e.parameter.ownerEmail);
@@ -79,19 +95,23 @@ function getOrCreateSheet(sheetName, headers) {
   var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = spreadsheet.getSheetByName(sheetName);
 
-  // Auto-create the sheet tab if it doesn't exist yet
   if (!sheet) {
     sheet = spreadsheet.insertSheet(sheetName);
     sheet.appendRow(headers);
     return sheet;
   }
 
-  // Ensure headers if the sheet is empty
   if (sheet.getLastRow() === 0) {
     sheet.appendRow(headers);
   }
 
   return sheet;
+}
+
+function getUsersSheet() {
+  return getOrCreateSheet(USERS_SHEET_NAME, [
+    'id', 'email', 'isAdmin', 'createdAt', 'lastLoginAt'
+  ]);
 }
 
 function getTasksSheet() {
@@ -106,6 +126,81 @@ function getSubjectsSheet() {
   return getOrCreateSheet(SUBJECTS_SHEET_NAME, [
     'id', 'name', 'academicYear', 'semester', 'ownerEmail'
   ]);
+}
+
+// ─── User Authentication & Roles ─────────────────────────────────
+
+function checkOrRegisterUser(email) {
+  if (!email) return jsonResponse({ error: 'Email required' });
+  var emailLower = email.toLowerCase();
+  var sheet = getUsersSheet();
+  
+  if (sheet.getLastRow() > 1) {
+    var data = sheet.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+        var rowEmail = String(data[i][USER_COL.EMAIL] || '').toLowerCase();
+        if (rowEmail === emailLower) {
+            sheet.getRange(i + 1, USER_COL.LAST_LOGIN_AT + 1).setValue(new Date().toISOString());
+            
+            // Treat string 'true' or boolean true as true 
+            var valAdmin = data[i][USER_COL.IS_ADMIN];
+            var isAdmin = valAdmin === true || String(valAdmin).toLowerCase() === 'true';
+            
+            return jsonResponse({ data: { email: emailLower, isAdmin: isAdmin } });
+        }
+    }
+  }
+  
+  var isFirstUser = sheet.getLastRow() === 1;
+  var createdAt = new Date().toISOString();
+  var newId = Utilities.getUuid();
+  var makeAdmin = isFirstUser; // Make first user admin automatically for convenience
+  sheet.appendRow([
+     newId,
+     emailLower,
+     makeAdmin,
+     createdAt,
+     createdAt
+  ]);
+  
+  return jsonResponse({ data: { email: emailLower, isAdmin: makeAdmin } });
+}
+
+function getAllUsers(adminEmail) {
+  if (!adminEmail) return jsonResponse({ error: 'Admin email required' });
+  var emailLower = adminEmail.toLowerCase();
+  var sheet = getUsersSheet();
+  
+  if (sheet.getLastRow() <= 1) return jsonResponse({ data: [] });
+  var data = sheet.getDataRange().getValues();
+  
+  var isAdmin = false;
+  for (var i = 1; i < data.length; i++) {
+     if (String(data[i][USER_COL.EMAIL] || '').toLowerCase() === emailLower) {
+         var valAdmin = data[i][USER_COL.IS_ADMIN];
+         isAdmin = valAdmin === true || String(valAdmin).toLowerCase() === 'true';
+         break;
+     }
+  }
+  
+  if (!isAdmin) {
+     return jsonResponse({ error: 'Unauthorized. Not an admin.' });
+  }
+  
+  var users = [];
+  for (var i = 1; i < data.length; i++) {
+     if (data[i][USER_COL.EMAIL] === '') continue;
+     var valAdminLoop = data[i][USER_COL.IS_ADMIN];
+     users.push({
+        id: String(data[i][USER_COL.ID]),
+        email: String(data[i][USER_COL.EMAIL]),
+        isAdmin: valAdminLoop === true || String(valAdminLoop).toLowerCase() === 'true',
+        createdAt: String(data[i][USER_COL.CREATED_AT]),
+        lastLoginAt: String(data[i][USER_COL.LAST_LOGIN_AT])
+     });
+  }
+  
+  return jsonResponse({ data: users });
 }
 
 // ─── Task CRUD ───────────────────────────────────────────────────
@@ -125,8 +220,6 @@ function getAllTasks(ownerEmail) {
 
     var rowEmail = String(data[i][TASK_COL.OWNER_EMAIL] || '');
     
-    // Server-side filtering: Only return tasks belonging to the requested ownerEmail
-    // If no ownerEmail is provided in the request, return empty array for security.
     if (!ownerEmail || rowEmail.toLowerCase() !== ownerEmail.toLowerCase()) {
       continue;
     }
@@ -153,7 +246,7 @@ function getAllTasks(ownerEmail) {
 
 function addTask(params) {
   if (!params.ownerEmail) {
-    return jsonResponse({ error: 'ownerEmail is required to add data' });
+    return jsonResponse({ error: 'ownerEmail is required' });
   }
 
   var sheet = getTasksSheet();
@@ -166,13 +259,13 @@ function addTask(params) {
     params.task || '',
     params.category || '',
     params.deadline || '',
-    '',                           // priority — auto-calculated on client
+    '',                           
     params.status || 'Not Started',
     params.note || '',
     createdAt,
     params.academicYear || '',
     params.semester || '',
-    params.ownerEmail.toLowerCase() // Save exact email for binding
+    params.ownerEmail.toLowerCase()
   ]);
 
   return jsonResponse({
@@ -199,8 +292,6 @@ function updateTask(id, params) {
 
   for (var i = 1; i < data.length; i++) {
     if (String(data[i][TASK_COL.ID]) === String(id)) {
-      // Security check: Only allow updates if ownerEmail matches or is legacy (blank)
-      // We pass ownerEmail in params from frontend
       var rowEmail = String(data[i][TASK_COL.OWNER_EMAIL] || '');
       if (params.ownerEmail && rowEmail && rowEmail.toLowerCase() !== params.ownerEmail.toLowerCase()) {
          return jsonResponse({ error: 'Unauthorized to update this task' });
@@ -213,22 +304,7 @@ function updateTask(id, params) {
       if (params.status != null) sheet.getRange(i + 1, TASK_COL.STATUS + 1).setValue(params.status);
       if (params.note != null) sheet.getRange(i + 1, TASK_COL.NOTE + 1).setValue(params.note);
 
-      return jsonResponse({
-        data: {
-          id: String(id),
-          subject: params.subject != null ? String(params.subject) : String(data[i][TASK_COL.SUBJECT]),
-          task: params.task != null ? String(params.task) : String(data[i][TASK_COL.TASK]),
-          category: params.category != null ? String(params.category) : String(data[i][TASK_COL.CATEGORY]),
-          deadline: params.deadline != null ? String(params.deadline) : String(data[i][TASK_COL.DEADLINE]),
-          priority: String(data[i][TASK_COL.PRIORITY]),
-          status: params.status != null ? String(params.status) : String(data[i][TASK_COL.STATUS]),
-          note: params.note != null ? String(params.note) : String(data[i][TASK_COL.NOTE]),
-          createdAt: String(data[i][TASK_COL.CREATED_AT]),
-          academicYear: String(data[i][TASK_COL.ACADEMIC_YEAR] || ''),
-          semester: String(data[i][TASK_COL.SEMESTER] || ''),
-          ownerEmail: rowEmail
-        }
-      });
+      return jsonResponse({ data: { id: id, success: true } });
     }
   }
 
@@ -259,9 +335,7 @@ function deleteTask(id, requestedEmail) {
 function getAllSubjects(ownerEmail) {
   var sheet = getSubjectsSheet();
 
-  if (sheet.getLastRow() <= 1) {
-    return jsonResponse({ data: [] });
-  }
+  if (sheet.getLastRow() <= 1) return jsonResponse({ data: [] });
 
   var data = sheet.getDataRange().getValues();
   var subjects = [];
@@ -270,11 +344,7 @@ function getAllSubjects(ownerEmail) {
     if (data[i][SUBJECT_COL.ID] === '') continue;
 
     var rowEmail = String(data[i][SUBJECT_COL.OWNER_EMAIL] || '');
-    
-    // Server-side filtering
-    if (!ownerEmail || rowEmail.toLowerCase() !== ownerEmail.toLowerCase()) {
-      continue;
-    }
+    if (!ownerEmail || rowEmail.toLowerCase() !== ownerEmail.toLowerCase()) continue;
 
     subjects.push({
       id: String(data[i][SUBJECT_COL.ID]),
@@ -289,9 +359,7 @@ function getAllSubjects(ownerEmail) {
 }
 
 function addSubject(params) {
-  if (!params.ownerEmail) {
-    return jsonResponse({ error: 'ownerEmail is required to save subject' });
-  }
+  if (!params.ownerEmail) return jsonResponse({ error: 'ownerEmail required' });
 
   var sheet = getSubjectsSheet();
   var id = Utilities.getUuid();
@@ -301,17 +369,11 @@ function addSubject(params) {
     params.name || '',
     params.academicYear || '',
     params.semester || '',
-    params.ownerEmail.toLowerCase() // Save exact email for binding
+    params.ownerEmail.toLowerCase()
   ]);
 
   return jsonResponse({
-    data: {
-      id: id,
-      name: params.name || '',
-      academicYear: params.academicYear || '',
-      semester: params.semester || '',
-      ownerEmail: params.ownerEmail.toLowerCase()
-    }
+    data: { id: id, name: params.name || '', ownerEmail: params.ownerEmail.toLowerCase() }
   });
 }
 
@@ -323,15 +385,43 @@ function deleteSubject(id, requestedEmail) {
     if (String(data[i][SUBJECT_COL.ID]) === String(id)) {
       var rowEmail = String(data[i][SUBJECT_COL.OWNER_EMAIL] || '');
       if (requestedEmail && rowEmail && rowEmail.toLowerCase() !== requestedEmail.toLowerCase()) {
-         return jsonResponse({ error: 'Unauthorized to delete this subject' });
+         return jsonResponse({ error: 'Unauthorized' });
+      }
+      
+      // Capture subject data before deleting
+      var subjectName = String(data[i][SUBJECT_COL.NAME] || '');
+      var acaYear = String(data[i][SUBJECT_COL.ACADEMIC_YEAR] || '');
+      var acaSem = String(data[i][SUBJECT_COL.SEMESTER] || '');
+      
+      // Delete the subject
+      sheet.deleteRow(i + 1);
+
+      // Cascade delete tasks linking to this subject
+      if (subjectName) {
+        var tasksSheet = getTasksSheet();
+        // Return early if no tasks exist
+        if (tasksSheet.getLastRow() > 1) {
+          var tasksData = tasksSheet.getDataRange().getValues();
+          
+          // Loop backwards to preserve indices when deleting rows
+          for (var j = tasksData.length - 1; j >= 1; j--) {
+            var tSubject = String(tasksData[j][TASK_COL.SUBJECT] || '');
+            var tYear = String(tasksData[j][TASK_COL.ACADEMIC_YEAR] || '');
+            var tSem = String(tasksData[j][TASK_COL.SEMESTER] || '');
+            var tEmail = String(tasksData[j][TASK_COL.OWNER_EMAIL] || '');
+            
+            if (tSubject === subjectName && tYear === acaYear && tSem === acaSem && tEmail.toLowerCase() === requestedEmail.toLowerCase()) {
+              tasksSheet.deleteRow(j + 1);
+            }
+          }
+        }
       }
 
-      sheet.deleteRow(i + 1);
       return jsonResponse({ success: true });
     }
   }
 
-  return jsonResponse({ error: 'Subject not found' });
+  return jsonResponse({ error: 'Not found' });
 }
 
 // ─── Utility ─────────────────────────────────────────────────────
